@@ -31,14 +31,14 @@ pip install git+http://github.com/uesseu/chainiter
 ```python
 from chaniter import ChainIter
 def test(x):
-    return x * 2
+>    return x * 2
 ChainIter(range(50)).map(test).calc().get()
 ```
 
 ## CLASSES
 - ChainIter: The iterator.
 - ProgressBar: Options for progress bar.
-    
+>    
 ## ChainIter
 Iterator which can used by method chain like Arry of node.js.  
 Multi processing and asyncio can run.  
@@ -47,25 +47,25 @@ Multi processing and asyncio can run.
 __init__(self, data:Iterable, indexable:bool=False, max_num:int=0, bar:bool=False, progressbar:ProgressBar=progressbar)  
 Parameters  
 data: Iterable  
-    It need not to be indexable.  
+>    It need not to be indexable.  
 indexable: bool  
-    If data is indexable, indexable should be True.  
+>    If data is indexable, indexable should be True.  
 max_num: int  
-    Length of the iterator.  
+>    Length of the iterator.  
 bar: bool  
-    Whether show progress bar or not.  
-    It is fancy, but may be slower.  
-    It cannot run with multiprocess.  
+>    Whether show progress bar or not.  
+>    It is fancy, but may be slower.  
+>    It cannot run with multiprocess.  
 
 ### arg(self, func:Callable, *args:Any, **kwargs:Any) -> Any
 Use ChainIter object as argument.  
 It is same as func(*ChainIter, *args, **kwargs)  
 
 Parameters  
-func: Callable  
+  func: Callable  
 
 Returns  
-Result of func(*ChainIter, *args, **kwargs)  
+  Result of func(*ChainIter, *args, **kwargs)  
 
 ```python
 ChainIter([5, 6]).arg(sum)  
@@ -77,13 +77,13 @@ Chainable map of coroutine, for example, async def function.
 
 Parameters  
 func: Callable  
-    Function to run.  
+>    Function to run.  
 core: int  
-    Number of cpu cores.  
-    If it is larger than 1, multiprocessing based on  
-    multiprocessing.Pool will be run.  
-    And so, If func cannot be lambda or coroutine if  
-    it is larger than 1.  
+>    Number of cpu cores.  
+>    If it is larger than 1, multiprocessing based on  
+>    multiprocessing.Pool will be run.  
+>    And so, If func cannot be lambda or coroutine if  
+>    it is larger than 1.  
 Returns  
 ChainIter with result  
 
@@ -107,8 +107,8 @@ Get data as list.
 
 Parameters
 kind: Callable
-    If you want to convert to object which is not list,
-    you can set it. For example, tuple, dqueue, and so on.
+>    If you want to convert to object which is not list,
+>    you can set it. For example, tuple, dqueue, and so on.
 
 ### has_index(self) -> bool
 Return whether it is indexable or not.
@@ -118,13 +118,13 @@ Chainable map.
   
 Parameters  
 func: Callable  
-    Function to run.  
+>    Function to run.  
 core: int  
-    Number of cpu cores.  
-    If it is larger than 1, multiprocessing based on  
-    multiprocessing.Pool will be run.  
-    And so, If func cannot be lambda or coroutine if  
-    it is larger than 1.  
+>    Number of cpu cores.  
+>    If it is larger than 1, multiprocessing based on  
+>    multiprocessing.Pool will be run.  
+>    And so, If func cannot be lambda or coroutine if  
+>    it is larger than 1.  
 Returns  
 ChainIter with result  
 
@@ -166,13 +166,13 @@ In this case, ChainIter.data must be Iterator of iterable objects.
   
 Parameters  
 func: Callable  
-    Function to run.  
+>    Function to run.  
 core: int  
-    Number of cpu cores.  
-    If it is larger than 1, multiprocessing based on  
-    multiprocessing.Pool will be run.  
-    And so, If func cannot be lambda or coroutine if  
-    it is larger than 1.  
+>    Number of cpu cores.  
+>    If it is larger than 1, multiprocessing based on  
+>    multiprocessing.Pool will be run.  
+>    And so, If func cannot be lambda or coroutine if  
+>    it is larger than 1.  
 Returns  
 ChainIter with result  
 
@@ -209,7 +209,7 @@ from chainiter import future, run_async
 
 @future
 async def hoge():
-    return 'fuga'
+>    return 'fuga'
 fuga = run_async(hoge())
 ```
 

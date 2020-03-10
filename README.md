@@ -3,12 +3,13 @@
 
 It is iterator object package for me.
 There are some useful feachers for me.
+This script cannot be harmful, but may be anti-pattern.
 
 - Use map, filter, and reduce by mechod chain.
 - Fast for a python code.
 - Show progress bar.
 - Run in parallel.
-- Run coroutines.
+- Run coroutines inparallel.
 
 ## Is it fast for python?
 
@@ -33,8 +34,8 @@ ChainIter(range(50)).map(test).calc().get()
 ```
 
 ## CLASSES
-- ChainIter
-- ProgressBar
+- ChainIter: The iterator.
+- ProgressBar: Options for progress bar.
     
 ## ChainIter
 Iterator which can used by method chain like Arry of node.js.

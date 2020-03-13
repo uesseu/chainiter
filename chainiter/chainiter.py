@@ -397,7 +397,7 @@ class ChainIter:
         """
         return func(*tuple(self.data), *args, **kwargs)
 
-    def calc(self) -> 'ChainIter':
+    def calc(self, core: int = 1) -> 'ChainIter':
         """
         ChainIter.data may be list, map, filter and so on.
         This method translate it to list.
@@ -407,7 +407,7 @@ class ChainIter:
         ----------
         ChainIter object with result.
         """
-        if self.bar is not None:
+        if self.bar is not None and core == 1:
             res = []
             start_time = current_time = time.time()
             for n, v in enumerate(self.data):
@@ -439,7 +439,13 @@ class ChainIter:
                 sec=round(time.time()-start_time, 3)))
             self.data = res
             return self
-        self.data = list(self.data)
+        else:
+            if core > 1:
+                def run(x: Any) -> Any: return x
+                with Pool(core) as pool:
+                    self.data = pool.map_async(run, self.data).get()
+            else:
+                self.data = list(self.data)
         return self
 
     def __len__(self) -> int:

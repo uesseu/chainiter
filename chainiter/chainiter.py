@@ -1,15 +1,62 @@
 from asyncio import new_event_loop, ensure_future, Future
 from typing import (Any, Callable, Iterable, cast, Coroutine,
-                    Iterator, List, Union, Sized)
+                    Iterator, List, Union, Sized, Optional)
 from itertools import starmap
 from multiprocessing import Pool
 from doctest import testmod
 from functools import reduce, wraps, partial
-from logging import Logger, INFO, getLogger, basicConfig
+from logging import Logger, getLogger
+from inspect import _empty, signature
 import time
 
 
 logger = getLogger('ChainIter')
+
+
+def compose(*funcs: Callable) -> Callable:
+    '''
+    >>> compose(multest, multest)(4)
+    16
+    '''
+    def composed(*args: Any) -> Any:
+        return reduce(lambda x, y: y(x), (funcs[0](*args),) + funcs[1:])
+    return composed
+
+
+def _curry_one(func: Callable) -> Callable:
+    def wrap(*args: Any, **kwargs: Any) -> Any:
+        return partial(func, *args, **kwargs)
+    return wrap
+
+
+def curry(num_of_args: Optional[int] = None) -> Callable:
+    '''
+    >>> fnc = curry(2)(multest2)
+    >>> fnc(2)(3)
+    6
+    >>> fnc = curry()(multest3)
+    >>> fnc(2)(3)(4)
+    24
+    '''
+    def curry_wrap(func: Callable) -> Callable:
+        length_of = compose(filter, list, len)
+        if num_of_args:
+            num = num_of_args
+        else:
+            def is_empty(x: Any) -> bool: return x.default is _empty
+            num = length_of(is_empty,
+                            signature(func).parameters.values())
+        for n in range(num - 1):
+            func = _curry_one(func)
+        return func
+    return curry_wrap
+
+
+def write_info(func: Callable) -> None:
+    if hasattr(func, '__name__'):
+        logger.info(' '.join(('Running', str(func.__name__))))
+    else:
+        logger.info(' '.join(('Running something without name.')))
 
 
 class ProgressBar:
@@ -77,8 +124,8 @@ class ChainIter:
     Multi processing and asyncio can run.
     """
     def __init__(self, data: Union[list, Iterable],
-                 indexable: bool = False, max_num: int = 0, bar: bool = False,
-                 progressbar: ProgressBar = default_progressbar):
+                 indexable: bool = False, max_num: int = 0,
+                 bar: Optional[ProgressBar] = None):
         """
         Parameters
         ----------
@@ -88,11 +135,12 @@ class ChainIter:
             If data is indexable, indexable should be True.
         max_num: int
             Length of the iterator.
-        bar: bool
-            Whether show progress bar or not.
-            It is fancy, but may be slower.
-            It cannot run with multiprocess.
+        bar: Optional[ProgressBar]
+            If ProgressBar object, it will display progressbar
+            when for statement or .calc method.
         """
+        if not hasattr(data, '__iter__'):
+            TypeError('It is not iterator')
         self.data = data
         self.indexable = indexable
         self.num = 0  # Iterator needs number.
@@ -102,7 +150,6 @@ class ChainIter:
             self.max = max_num
         self.bar = bar
         self.bar_len = 30
-        self.progressbar = progressbar
 
     def map(self, func: Callable, core: int = 1) -> 'ChainIter':
         """
@@ -125,13 +172,13 @@ class ChainIter:
         >>> ChainIter([5, 6]).map(lambda x: x * 2).get()
         [10, 12]
         """
-        logger.info(' '.join(('Running', str(func.__name__))))
+        write_info(func)
         if (core == 1):
             return ChainIter(map(func, self.data), False, self.max,
-                             self.bar, self.progressbar)
+                             self.bar)
         with Pool(core) as pool:
             result = pool.map_async(func, self.data).get()
-        return ChainIter(result, True, self.max, self.bar, self.progressbar)
+        return ChainIter(result, True, self.max, self.bar)
 
     def starmap(self, func: Callable, core: int = 1) -> 'ChainIter':
         """
@@ -155,13 +202,13 @@ class ChainIter:
         >>> ChainIter([5, 6]).zip([2, 3]).starmap(multest2).get()
         [10, 18]
         """
-        logger.info(' '.join(('Running', str(func.__name__))))
+        write_info(func)
         if core == 1:
             return ChainIter(starmap(func, self.data),
-                             False, self.max, self.bar, self.progressbar)
+                             False, self.max, self.bar)
         with Pool(core) as pool:
             result = pool.starmap_async(func, self.data).get()
-        return ChainIter(result, True, self.max, self.bar, self.progressbar)
+        return ChainIter(result, True, self.max, self.bar)
 
     def filter(self, func: Callable) -> 'ChainIter':
         """
@@ -172,9 +219,8 @@ class ChainIter:
         ----------
         func: Callable
         """
-        logger.info(' '.join(('Running', str(func.__name__))))
-        return ChainIter(filter(func, self.data), False, 0, self.bar,
-                         self.progressbar)
+        write_info(func)
+        return ChainIter(filter(func, self.data), False, 0, self.bar)
 
     def async_map(self, func: Callable, chunk: int = 1) -> 'ChainIter':
         """
@@ -194,15 +240,15 @@ class ChainIter:
         ---------
         ChainIter with result
         """
-        logger.info(' '.join(('Running', str(func.__name__))))
+        write_info(func)
         if chunk == 1:
             return ChainIter(starmap(run_async,
                                      ((func, a) for a in self.data)),
-                             False, self.max, self.bar, self.progressbar)
+                             False, self.max, self.bar)
         with Pool(chunk) as pool:
             result = pool.starmap_async(run_async,
                                         ((func, a) for a in self.data)).get()
-        return ChainIter(result, True, self.max, self.bar, self.progressbar)
+        return ChainIter(result, True, self.max, self.bar)
 
     def has_index(self) -> bool:
         """
@@ -228,7 +274,7 @@ class ChainIter:
         ----------
         Result of reduce.
         """
-        logger.info(' '.join(('Running', str(func.__name__))))
+        write_info(func)
         return reduce(func, self.data)
 
     def get(self, kind: type = list) -> Any:
@@ -241,6 +287,8 @@ class ChainIter:
             If you want to convert to object which is not list,
             you can set it. For example, tuple, dqueue, and so on.
         """
+        if self.indexable and isinstance(self.data, list):
+            return self.data
         return kind(self.data)
 
     def zip(self, *args: Iterable) -> 'ChainIter':
@@ -256,34 +304,34 @@ class ChainIter:
         ----------
         Result of func(*ChainIter, *args, **kwargs)
         """
-        return ChainIter(zip(self.data, *args), False, 0, self.bar,
-                         self.progressbar)
+        return ChainIter(zip(self.data, *args), False, 0, self.bar)
 
     def __iter__(self) -> 'ChainIter':
         self.calc()
         self.max = len(cast(list, self.data))
+        self.num = 0
         return self
 
     def __next__(self) -> Any:
-        if self.bar:
+        if self.bar is not None:
             self.start_time = self.current_time = time.time()
             self.prev_time = self.current_time
             self.current_time = time.time()
             epoch_time = self.current_time - self.prev_time
             if self.max != 0:
                 bar_num = int((self.num + 1) / self.max * self.bar_len)
-                print(self.progressbar.progress.format(
+                print(self.bar.progress.format(
                     percent=int(100 * (self.num + 1) / self.max),
-                    bar=self.progressbar.bar * bar_num,
-                    arrow=self.progressbar.arrow,
-                    space=self.progressbar.space * (self.bar_len - bar_num),
+                    bar=self.bar.bar * bar_num,
+                    arrow=self.bar.arrow,
+                    space=self.bar.space * (self.bar_len - bar_num),
                     div=' ' + str(self.num + 1) + '/' + str(self.max),
                     epoch_time=round(epoch_time, 3),
                     speed=round(1 / epoch_time, 3)
                     ), end='')
             else:
-                print(self.progressbar.cycle.format(
-                    cycle=self.progressbar.cycle_token[self.num % 4],
+                print(self.bar.cycle.format(
+                    cycle=self.bar.cycle_token[self.num % 4],
                     div=' ' + str(self.num + 1) + '/' + str(self.max),
                     epoch_time=round(epoch_time, 3),
                     speed=round(1 / epoch_time, 3)
@@ -295,6 +343,15 @@ class ChainIter:
                     sec=round(time.time() - self.start_time, 3)))
             raise StopIteration
         return self.__getitem__(self.num - 1)
+
+    def append(self, item: Any) -> 'ChainIter':
+        if not isinstance(self.data, list):
+            self.calc()
+        cast(list, self.data).append(item)
+        return self
+
+    def __add__(self, item: Any) -> 'ChainIter':
+        return self.append(item)
 
     def __reversed__(self) -> Iterable:
         if hasattr(self.data, '__reversed__'):
@@ -350,7 +407,7 @@ class ChainIter:
         ----------
         ChainIter object with result.
         """
-        if self.bar:
+        if self.bar is not None:
             res = []
             start_time = current_time = time.time()
             for n, v in enumerate(self.data):
@@ -361,20 +418,19 @@ class ChainIter:
                 if self.max != 0:
                     bar_num = int((n + 1) / self.max * self.bar_len)
                     percent = int(100 * (n + 1) / self.max)
-                    bar = self.progressbar.bar * bar_num
-                    print(self.progressbar.progress.format(
+                    bar = self.bar.bar * bar_num
+                    print(self.bar.progress.format(
                         percent=percent,
                         bar=bar,
-                        arrow=self.progressbar.arrow,
-                        space=self.progressbar.space * (self.bar_len
-                                                        - bar_num),
+                        arrow=self.bar.arrow,
+                        space=self.bar.space * (self.bar_len - bar_num),
                         div=' ' + str(n + 1) + '/' + str(self.max),
                         epoch_time=round(epoch_time, 3),
                         speed=round(1 / epoch_time, 3)
                         ), end='')
                 else:
-                    print(self.progressbar.cycle.format(
-                        cycle=self.progressbar.cycle_token[n % 4],
+                    print(self.bar.cycle.format(
+                        cycle=self.bar.cycle_token[n % 4],
                         div=' ' + str(n + 1) + '/' + str(self.max),
                         epoch_time=round(epoch_time, 3),
                         speed=round(1 / epoch_time, 3)
@@ -387,7 +443,9 @@ class ChainIter:
         return self
 
     def __len__(self) -> int:
-        self.calc()
+        if not self.indexable:
+            self.calc()
+            self.indexable = True
         return len(cast(list, self.data))
 
     def __repr__(self) -> str:

@@ -151,7 +151,8 @@ class ChainIter:
         self.bar = bar
         self.bar_len = 30
 
-    def map(self, func: Callable, core: int = 1) -> 'ChainIter':
+    def map(self, func: Callable, core: int = 1,
+            timeout: Optional[float] = None) -> 'ChainIter':
         """
         Chainable map.
 
@@ -177,10 +178,11 @@ class ChainIter:
             return ChainIter(map(func, self.data), False, self.max,
                              self.bar)
         with Pool(core) as pool:
-            result = pool.map_async(func, self.data).get()
+            result = pool.map_async(func, self.data).get(timeout)
         return ChainIter(result, True, self.max, self.bar)
 
-    def starmap(self, func: Callable, core: int = 1) -> 'ChainIter':
+    def starmap(self, func: Callable, core: int = 1,
+                timeout: Optional[float] = None) -> 'ChainIter':
         """
         Chainable starmap.
         In this case, ChainIter.data must be Iterator of iterable objects.
@@ -207,7 +209,7 @@ class ChainIter:
             return ChainIter(starmap(func, self.data),
                              False, self.max, self.bar)
         with Pool(core) as pool:
-            result = pool.starmap_async(func, self.data).get()
+            result = pool.starmap_async(func, self.data).get(timeout)
         return ChainIter(result, True, self.max, self.bar)
 
     def filter(self, func: Callable) -> 'ChainIter':
@@ -222,7 +224,8 @@ class ChainIter:
         write_info(func)
         return ChainIter(filter(func, self.data), False, 0, self.bar)
 
-    def async_map(self, func: Callable, chunk: int = 1) -> 'ChainIter':
+    def async_map(self, func: Callable, chunk: int = 1,
+                  timeout: Optional[float] = None) -> 'ChainIter':
         """
         Chainable map of coroutine, for example, async def function.
 
@@ -247,7 +250,8 @@ class ChainIter:
                              False, self.max, self.bar)
         with Pool(chunk) as pool:
             result = pool.starmap_async(run_async,
-                                        ((func, a) for a in self.data)).get()
+                                        ((func, a) for a in self.data)
+                                        ).get(timeout)
         return ChainIter(result, True, self.max, self.bar)
 
     def has_index(self) -> bool:

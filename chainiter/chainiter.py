@@ -1,14 +1,14 @@
 from asyncio import new_event_loop, ensure_future, Future
 from typing import (Any, Callable, Iterable, cast, Coroutine,
-                    Iterator, List, Union, Sized, Optional)
-from itertools import starmap
+                    Union, Sized, Optional)
+from itertools import starmap, product
 from multiprocessing import Pool
 from doctest import testmod
 from functools import reduce, wraps, partial
-from logging import Logger, getLogger
+from logging import getLogger
 from inspect import _empty, signature
 import time
-
+from threading import Thread
 
 logger = getLogger('ChainIter')
 
@@ -181,7 +181,7 @@ class ChainIter:
             result = pool.map_async(func, self.data).get(timeout)
         return ChainIter(result, True, self.max, self.bar)
 
-    def starmap(self, func: Callable, core: int = 1,
+    def starmap(self, func: Callable, chunk: int = 1,
                 timeout: Optional[float] = None) -> 'ChainIter':
         """
         Chainable starmap.
@@ -205,10 +205,10 @@ class ChainIter:
         [10, 18]
         """
         write_info(func)
-        if core == 1:
+        if chunk == 1:
             return ChainIter(starmap(func, self.data),
                              False, self.max, self.bar)
-        with Pool(core) as pool:
+        with Pool(chunk) as pool:
             result = pool.starmap_async(func, self.data).get(timeout)
         return ChainIter(result, True, self.max, self.bar)
 
@@ -251,6 +251,36 @@ class ChainIter:
         with Pool(chunk) as pool:
             result = pool.starmap_async(run_async,
                                         ((func, a) for a in self.data)
+                                        ).get(timeout)
+        return ChainIter(result, True, self.max, self.bar)
+
+    def async_starmap(self, func: Callable, chunk: int = 1,
+                      timeout: Optional[float] = None) -> 'ChainIter':
+        """
+        Chainable starmap of coroutine, for example, async def function.
+
+        Parameters
+        ----------
+        func: Callable
+            Function to run.
+        core: int
+            Number of cpu cores.
+            If it is larger than 1, multiprocessing based on
+            multiprocessing.Pool will be run.
+            And so, If func cannot be lambda or coroutine if
+            it is larger than 1.
+        Returns
+        ---------
+        ChainIter with result
+        """
+        write_info(func)
+        if chunk == 1:
+            return ChainIter(starmap(run_async,
+                                     ((func, *a) for a in self.data)),
+                             False, self.max, self.bar)
+        with Pool(chunk) as pool:
+            result = pool.starmap_async(run_async,
+                                        ((func, *a) for a in self.data)
                                         ).get(timeout)
         return ChainIter(result, True, self.max, self.bar)
 
@@ -311,17 +341,20 @@ class ChainIter:
         return ChainIter(zip(self.data, *args), False, 0, self.bar)
 
     def __iter__(self) -> 'ChainIter':
+        bar = self.bar
+        self.bar = None
         self.calc()
+        self.bar = bar
         self.max = len(cast(list, self.data))
         self.num = 0
+        self.start_time = self.current_time = time.time()
         return self
 
     def __next__(self) -> Any:
         if self.bar is not None:
-            self.start_time = self.current_time = time.time()
             self.prev_time = self.current_time
             self.current_time = time.time()
-            epoch_time = self.current_time - self.prev_time
+            epoch_time = self.current_time - self.prev_time + 1e-15
             if self.max != 0:
                 bar_num = int((self.num + 1) / self.max * self.bar_len)
                 print(self.bar.progress.format(
@@ -470,6 +503,10 @@ class ChainIter:
         """
         print(self.data)
         return self
+
+
+def chain_product(*args: Iterable) -> ChainIter:
+    return ChainIter(product(args))
 
 
 if __name__ == '__main__':

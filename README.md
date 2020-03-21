@@ -18,7 +18,7 @@ It is a package for me. I do'nt want slow one.
 It is based not on list but on iterators.  
 Ofcource, speed of python is slow.  
 And so, I tried to minimize orverhead.  
-When it shows progress bar, it may be slow down.  
+When it shows progress bar, it may be slow.  
 
 ## install
 

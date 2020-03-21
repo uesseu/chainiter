@@ -14,10 +14,11 @@ logger = getLogger('ChainIter')
 
 
 def compose(*funcs: Callable) -> Callable:
-    '''
+    """
+    Just a compose function
     >>> compose(multest, multest)(4)
     16
-    '''
+    """
     def composed(*args: Any) -> Any:
         return reduce(lambda x, y: y(x), (funcs[0](*args),) + funcs[1:])
     return composed
@@ -30,14 +31,16 @@ def _curry_one(func: Callable) -> Callable:
 
 
 def curry(num_of_args: Optional[int] = None) -> Callable:
-    '''
+    """
+    Just a curry function.
     >>> fnc = curry(2)(multest2)
     >>> fnc(2)(3)
     6
     >>> fnc = curry()(multest3)
     >>> fnc(2)(3)(4)
     24
-    '''
+    """
+    @wraps
     def curry_wrap(func: Callable) -> Callable:
         length_of = compose(filter, list, len)
         if num_of_args:
@@ -444,7 +447,7 @@ class ChainIter:
         ----------
         ChainIter object with result.
         """
-        if self.bar is not None and core == 1:
+        if self.bar is not None and core == 1 and not self.indexable:
             res = []
             start_time = current_time = time.time()
             for n, v in enumerate(self.data):
@@ -506,6 +509,11 @@ class ChainIter:
 
 
 def chain_product(*args: Iterable) -> ChainIter:
+    """
+    Returns
+    ---------
+    ChainIter object.
+    """
     return ChainIter(product(args))
 
 

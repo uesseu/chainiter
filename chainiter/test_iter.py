@@ -1,7 +1,8 @@
-from chainiter import ChainIter, future
+from chainiter import ChainIter, future, ProgressBar
 from doctest import testmod
 from time import sleep, time
 from logging import basicConfig, INFO
+from itertools import product
 # basicConfig(level=INFO)
 
 async def itest(x): return x * 2
@@ -17,6 +18,7 @@ async def test(x: int) -> int:
     return await hoge(x)
 
 def test3(x, y): return x * y
+async def async_test3(x, y): return x * y
 def test2(x: int) -> int: return x * 2
 def titest(x: int) -> int:
     sleep(0.05)
@@ -31,16 +33,18 @@ current = time()
 print(time() - current)
 
 
-print(ChainIter([2, 3, 4], bar=True).async_map(test).map(test2)[0])
-print(ChainIter(range(30), bar=True).map(titest).map(test2).calc())
+bar = ProgressBar()
+print(ChainIter([2, 3, 4], bar=bar).async_map(test).map(test2)[0])
+print(ChainIter(range(30), bar=bar).map(titest).map(test2).calc())
 print(ChainIter([1, 2]))
-print(ChainIter([5, 3]).async_map(itest, 2).map(test2, 2)[0])
-for n in ChainIter(range(40), bar=True).async_map(test).map(test2):
+print(ChainIter([5, 3]).async_map(itest, 2).map(test2, 2).get())
+for n in ChainIter(range(40), bar=bar).async_map(test).map(test2):
     sleep(0.05)
 print(ChainIter([2, 3]).async_map(test, 2).map(test2, 2).get(tuple))
-coco = ChainIter(range(50), bar=True)
-coco.progressbar.arrow = '8'
-coco.map(titest).calc().get(tuple)
+bar.arrow = '8'
+coco = ChainIter(range(50), bar=bar)
+coco.map(titest, 2).calc().get(tuple)
 ho = ChainIter([2, 3]).async_map(test).map(test2).get()
 print(ho[0])
 print(ho[1])
+ChainIter(product([1, 2], [3, 4])).async_starmap(async_test3, 2).calc().print()

@@ -178,8 +178,7 @@ class ChainIter:
         """
         write_info(func)
         if (core == 1):
-            return ChainIter(map(func, self.data), False, self.max,
-                             self.bar)
+            return ChainIter(map(func, self.data), False, self.max, self.bar)
         with Pool(core) as pool:
             result = pool.map_async(func, self.data).get(timeout)
         return ChainIter(result, True, self.max, self.bar)
@@ -376,13 +375,15 @@ class ChainIter:
                     epoch_time=round(epoch_time, 3),
                     speed=round(1 / epoch_time, 3)
                     ), end='')
-        self.num += 1
         if self.num == self.max:
             if self.bar:
                 print('\nComplete in {sec} sec!'.format(
                     sec=round(time.time() - self.start_time, 3)))
+            self.num = 0
             raise StopIteration
-        return self.__getitem__(self.num - 1)
+        result = self.__getitem__(self.num)
+        self.num += 1
+        return result
 
     def append(self, item: Any) -> 'ChainIter':
         if not isinstance(self.data, list):
@@ -487,6 +488,9 @@ class ChainIter:
             else:
                 self.data = list(self.data)
         return self
+
+    def len(self) -> int:
+        return len(self)
 
     def __len__(self) -> int:
         if not self.indexable:

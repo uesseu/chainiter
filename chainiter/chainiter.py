@@ -16,6 +16,7 @@ logger = getLogger('ChainIter')
 def compose(*funcs: Callable) -> Callable:
     """
     Just a compose function
+    >>> def multest(x): return x * 2
     >>> compose(multest, multest)(4)
     16
     """
@@ -25,6 +26,12 @@ def compose(*funcs: Callable) -> Callable:
 
 
 def _curry_one(func: Callable) -> Callable:
+    """
+    >>> def multest2(x, y): return x * y
+    >>> fnc = _curry_one(multest2)
+    >>> fnc(2)(3)
+    6
+    """
     def wrap(*args: Any, **kwargs: Any) -> Any:
         return partial(func, *args, **kwargs)
     return wrap
@@ -33,25 +40,26 @@ def _curry_one(func: Callable) -> Callable:
 def curry(num_of_args: Optional[int] = None) -> Callable:
     """
     Just a curry function.
+    >>> def multest2(x, y): return x * y
     >>> fnc = curry(2)(multest2)
     >>> fnc(2)(3)
     6
+    >>> def multest3(x, y, z): return x * y * z
     >>> fnc = curry()(multest3)
     >>> fnc(2)(3)(4)
     24
     """
-    @wraps
     def curry_wrap(func: Callable) -> Callable:
+        wr = wraps(func)
         length_of = compose(filter, list, len)
         if num_of_args:
             num = num_of_args
         else:
             def is_empty(x: Any) -> bool: return x.default is _empty
-            num = length_of(is_empty,
-                            signature(func).parameters.values())
+            num = length_of(is_empty, signature(func).parameters.values())
         for n in range(num - 1):
             func = _curry_one(func)
-        return func
+        return wr(func)
     return curry_wrap
 
 
@@ -490,7 +498,19 @@ class ChainIter:
         return self
 
     def len(self) -> int:
-        return len(self)
+        return len(self).get()
+
+    def __lt__(self, arg: Any) -> list:
+        return ChainIter(map(lambda x: x < arg, self.data)).get()
+
+    def __le__(self, arg: Any) -> list:
+        return ChainIter(map(lambda x: x <= arg, self.data)).get()
+
+    def __gt__(self, arg: Any) -> list:
+        return ChainIter(map(lambda x: x > arg, self.data)).get()
+
+    def __ge__(self, arg: Any) -> list:
+        return ChainIter(map(lambda x: x >= arg, self.data)).get()
 
     def __len__(self) -> int:
         if not self.indexable:

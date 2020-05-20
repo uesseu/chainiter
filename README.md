@@ -1,10 +1,8 @@
 # ChainIter
 ## What is this?
 
-It is iterator object package for me.  
-There are some useful feachers for me.  
-Ofcourse, you can use it.  
-This script cannot be harmful, but may be anti-pattern.  
+It is iterator object package for me. Multiprocessing can done easily.
+Ofcourse, you can use it. This script cannot be harmful, but may be anti-pattern.  
 
 - Use map, filter, and reduce by mechod chain.
 - Fast for a python code.
@@ -14,10 +12,8 @@ This script cannot be harmful, but may be anti-pattern.
 
 ## Is it fast for python?
 
-It is a package for me. I do'nt want slow one.  
-It is based not on list but on iterators.  
-Ofcource, speed of python is slow.  
-And so, I tried to minimize orverhead.  
+It is a package for me. I do'nt want slow one. It is based not on list but on iterators.  
+Ofcource, speed of python is slow. And so, I tried to minimize orverhead.  
 When it shows progress bar, it may be slow.  
 
 ## install
@@ -44,35 +40,37 @@ Iterator which can used by method chain like Arry of node.js.
 Multi processing and asyncio can run.  
 
 ### Methods
-__init__(self, data:Iterable, indexable:bool=False, max_num:int=0, bar:bool=False, progressbar:ProgressBar=progressbar)  
-Parameters  
-data: Iterable  
 
->    It need not to be indexable.  
+```python
+__init__(self, data:Iterable, indexable:bool=False, max_num:int=0,
+	 bar:bool=False, progressbar:ProgressBar=progressbar)  
+```
 
-indexable: bool  
+#### Parameters  
 
->    If data is indexable, indexable should be True.  
+| arg       | type     |                                                                                                    |
+|-----------|----------|----------------------------------------------------------------------------------------------------|
+| data      | Iterable | It need not to be indexable.                                                                       |
+| indexable | bool     | If data is indexable, indexable should be True.                                                    |
+| max_num   | int      | Length of the iterator.                                                                            |
+| bar       | bool     | Whether show progress bar or not. It is fancy, but may be slower. It cannot run with multiprocess. |
 
-max_num: int  
+### arg
 
->    Length of the iterator.  
+```python
+arg(self, func:Callable, *args:Any, **kwargs:Any) -> Any
+```
 
-bar: bool  
-
->    Whether show progress bar or not.  
->    It is fancy, but may be slower.  
->    It cannot run with multiprocess.  
-
-### arg(self, func:Callable, *args:Any, **kwargs:Any) -> Any
 Use ChainIter object as argument.  
 It is same as func(*ChainIter, *args, **kwargs)  
 
-Parameters  
-  func: Callable  
+#### Parameters  
+| arg  | type     |                 |
+|------|----------|-----------------|
+| func | Callable | Function to run |
 
-Returns  
-  Result of func(*ChainIter, *args, **kwargs)  
+#### Returns  
+Result of func(*ChainIter, *args, **kwargs)  
 
 ```python
 ChainIter([5, 6]).arg(sum)  

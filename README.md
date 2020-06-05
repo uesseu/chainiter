@@ -1,24 +1,27 @@
 # ChainIter
 ## What is this?
 
-It is iterator object package for me. Multiprocessing can done easily.
+It is iterator object package for me. Multiprocessing can done easily.  
 Ofcourse, you can use it. This script cannot be harmful, but may be anti-pattern.  
+It can...
 
 - Use map, filter, and reduce by mechod chain.
-- Fast for a python code.
+- Calculate fast for a python code.
 - Show progress bar.
-- Run in parallel.
+- Performe parallel computing.
 - Run coroutines inparallel.
 
 ## Is it fast for python?
 
 It is a package for me. I do'nt want slow one. It is based not on list but on iterators.  
 Ofcource, speed of python is slow. And so, I tried to minimize orverhead.  
+If you write a simple python code, it cannot be faster than numpy.  
+But calcurating by 1 process may be limited by IO, memory, and so on.  
 When it shows progress bar, it may be slow.  
 
 ## install
 
-```python
+```bash
 pip install git+http://github.com/uesseu/chainiter
 ```
 
@@ -80,20 +83,18 @@ ChainIter([5, 6]).arg(sum)
 ### async_map(self, func:Callable, chunk:int=1) -> 'ChainIter'
 Chainable map of coroutine, for example, async def function.  
 
-Parameters  
-func: Callable  
+#### Parameters  
+| arg  | type     |                      |
+|------|----------|----------------------|
+| func | Callable | Function to run.     |
+| core | int      | Number of cpu cores. |
 
->    Function to run.  
+If "cores" is larger than 1, multiprocessing based on
+multiprocessing.Pool will be run.  
+And so, If func cannot be lambda or coroutine if  
+it is larger than 1.  
 
-core: int  
-
->    Number of cpu cores.  
->    If it is larger than 1, multiprocessing based on  
->    multiprocessing.Pool will be run.  
->    And so, If func cannot be lambda or coroutine if  
->    it is larger than 1.  
-
-Returns  
+#### Returns  
 ChainIter with result  
 
 ### calc(self) -> 'ChainIter'
@@ -101,43 +102,44 @@ ChainIter.data may be list, map, filter and so on.
 This method translate it to list.  
 If you do not run in parallel, it can print progress bar.  
 
-Returns  
+#### Returns  
 ChainIter object with result.  
 
 ### filter(self, func:Callable) -> 'ChainIter'
 Simple filter function.  
 It kills progress bar.  
   
-Parameters  
+#### Parameters  
 func: Callable  
 
 ### get(self, kind:type=<class 'list'>) -> Any
 Get data as list.
 
-Parameters
-kind: Callable
+#### Parameters
+| arg  | type     |                 |
+|------|----------|-----------------|
+| kind | Callable | Kind of output. |
 
->    If you want to convert to object which is not list,
->    you can set it. For example, tuple, dqueue, and so on.
+If you want to convert to object which is not list,
+you can set it. For example, tuple, dqueue, and so on.
 
 ### has_index(self) -> bool
-Return whether it is indexable or not.
+
+#### Return whether it is indexable or not.
 
 ### map(self, func:Callable, core:int=1) -> 'ChainIter'
 Chainable map.  
   
-Parameters  
-func: Callable  
+#### Parameters  
+| arg  | type     |                      |
+|------|----------|----------------------|
+| func | Callable | Function to run.     |
+| core | int      | Number of cpu cores. |
 
->    Function to run.  
-
-core: int  
-
->    Number of cpu cores.  
->    If it is larger than 1, multiprocessing based on  
->    multiprocessing.Pool will be run.  
->    And so, If func cannot be lambda or coroutine if  
->    it is larger than 1.  
+If it is larger than 1, multiprocessing based on  
+multiprocessing.Pool will be run.  
+And so, If func cannot be lambda or coroutine if  
+it is larger than 1.  
 
 Returns  
 ChainIter with result  
@@ -149,24 +151,29 @@ ChainIter([5, 6]).map(lambda x: x * 2).get()
 
 ### print(self) -> 'ChainIter'
 Just print the content.
+Returns self.
 
 ### reduce(self, func:Callable) -> Any
 Simple reduce function.  
   
-Parameters  
-func: Callable  
+#### Parameters  
+| arg  | type     |                    |
+|------|----------|--------------------|
+| func | Callable | Function to reduce |
   
-Returns  
+#### Returns  
 Result of reduce.  
 
 ### stararg(self, func:Callable, *args:Any, **kwargs:Any) -> Any
 Use ChainIter object as argument.  
 It is same as func(*tuple(ChainIter), *args, **kwargs)  
   
-Parameters  
-func: Callable  
+#### Parameters  
+| arg  | type     |                 |
+|------|----------|-----------------|
+| func | Callable | Function to run |
   
-Returns  
+#### Returns  
 ChainIter object  
 
 ```python
@@ -178,20 +185,18 @@ ChainIter([5, 6]).stararg(lambda x, y: x * y)
 Chainable starmap.  
 In this case, ChainIter.data must be Iterator of iterable objects.  
   
-Parameters  
-func: Callable  
+#### Parameters  
+| arg  | type     |                      |
+|------|----------|----------------------|
+| func | Callable | Function to run.     |
+| core | int      | Number of cpu cores. |
 
->    Function to run.  
+If 'core' is larger than 1, multiprocessing based on  
+multiprocessing.Pool will be run.  
+And so, If func cannot be lambda or coroutine if  
+it is larger than 1.  
 
-core: int  
-
->    Number of cpu cores.  
->    If it is larger than 1, multiprocessing based on  
->    multiprocessing.Pool will be run.  
->    And so, If func cannot be lambda or coroutine if  
->    it is larger than 1.  
-
-Returns  
+#### Returns  
 ChainIter with result  
 
 ```python
@@ -205,7 +210,9 @@ Simple chainable zip function.
 It kills progress bar.  
   
 Parameters  
-*args: Iterators to zip.  
+| arg   | type |                   |
+|-------|------|-------------------|
+| *args | Any  | Iterators to zip. |
   
 Returns  
 Result of func(*ChainIter, *args, **kwargs)  
@@ -214,8 +221,7 @@ Result of func(*ChainIter, *args, **kwargs)
 An container for progressbar.
 
 ## future(func:Callable) -> Callable
-Let coroutine return future object.  
-It can be used as decorator.  
+Let coroutine return future object. It can be used as decorator.  
 
 ## run_async(func:Callable, *args:Any, **kwargs:Any) -> Any
 Assemble coroutine and run.

@@ -1,7 +1,7 @@
 # ChainIter
 ## What is this?
 
-It is iterator object package for me. Multiprocessing can done easily.  
+It is iterator object package for me. Multiprocessing can be performed easily.  
 Ofcourse, you can use it. This script cannot be harmful, but may be anti-pattern.  
 It can...
 

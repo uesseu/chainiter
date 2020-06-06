@@ -49,7 +49,7 @@ print(time() - current)
 
 
 print(ChainIter(range(10)) > 5)
-bar = ProgressBar()
+bar = True#ProgressBar()
 print(ChainIter([2, 3, 4], bar=bar).async_map(test).map(test2)[0])
 print(ChainIter(range(30), bar=bar).map(titest).map(test2).calc())
 print(ChainIter([1, 2]))
@@ -57,7 +57,8 @@ print(ChainIter([5, 3]).async_map(itest, 2).map(test2, 2).get())
 for n in ChainIter(range(40), bar=bar).async_map(test).map(test2):
     sleep(0.05)
 print(ChainIter([2, 3]).async_map(test, 2).map(test2, 2).get(tuple))
-bar.arrow = '8'
+if isinstance(bar, ProgressBar):
+    bar.arrow = '8'
 coco = ChainIter(range(50), bar=bar)
 coco.map(titest, 2).calc().get(tuple)
 ho = ChainIter([2, 3]).async_map(test).map(test2).get()

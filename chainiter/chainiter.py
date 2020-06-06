@@ -2,6 +2,7 @@ from asyncio import new_event_loop, ensure_future, Future
 from typing import (Any, Callable, Iterable, cast, Coroutine,
                     Union, Sized, Optional)
 from itertools import starmap, product
+from collections import namedtuple
 from multiprocessing import Pool
 from doctest import testmod
 from functools import reduce, wraps, partial
@@ -136,7 +137,7 @@ class ChainIter:
     """
     def __init__(self, data: Union[list, Iterable],
                  indexable: bool = False, max_num: int = 0,
-                 bar: Optional[ProgressBar] = None):
+                 bar: Union[bool, ProgressBar] = False):
         """
         Parameters
         ----------
@@ -155,11 +156,15 @@ class ChainIter:
         self.data = data
         self.indexable = indexable
         self.num = 0  # Iterator needs number.
+        self.bar: Union[ProgressBar, bool]
         if hasattr(data, '__len__'):
             self.max = len(cast(Sized, data))
         else:
             self.max = max_num
-        self.bar = bar
+        if isinstance(bar, bool) and bar:
+            self.bar = ProgressBar()
+        else:
+            self.bar = bar
         self.bar_len = 30
 
     def map(self, func: Callable, core: int = 1,
@@ -361,7 +366,7 @@ class ChainIter:
         return self
 
     def __next__(self) -> Any:
-        if self.bar is not None:
+        if self.bar:
             self.prev_time = self.current_time
             self.current_time = time.time()
             epoch_time = self.current_time - self.prev_time + 1e-15
@@ -456,7 +461,7 @@ class ChainIter:
         ----------
         ChainIter object with result.
         """
-        if self.bar is not None and core == 1 and not self.indexable:
+        if self.bar and core == 1 and not self.indexable:
             res = []
             start_time = current_time = time.time()
             for n, v in enumerate(self.data):

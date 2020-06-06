@@ -46,17 +46,22 @@ Multi processing and asyncio can run.
 
 ```python
 __init__(self, data:Iterable, indexable:bool=False, max_num:int=0,
-	 bar:bool=False, progressbar:ProgressBar=progressbar)  
+	 bar:bool=False, progressbar:ProgressBar=none)  
 ```
 
 #### Parameters  
 
-| arg       | type     |                                                                                                    |
-|-----------|----------|----------------------------------------------------------------------------------------------------|
-| data      | Iterable | It need not to be indexable.                                                                       |
-| indexable | bool     | If data is indexable, indexable should be True.                                                    |
-| max_num   | int      | Length of the iterator.                                                                            |
-| bar       | bool     | Whether show progress bar or not. It is fancy, but may be slower. It cannot run with multiprocess. |
+| arg       | type                           |                                                                                     |
+|-----------|--------------------------------|-------------------------------------------------------------------------------------|
+| data      | Iterable                       | It need not to be indexable.                                                        |
+| indexable | bool                           | If data is indexable, indexable should be True.                                     |
+| max_num   | int                            | Length of the iterator.                                                             |
+| bar       | Union[bool, ProgressBar] | Show progress bar. It is fancy, but may be slower. It cannot run with multiprocess. |
+
+Bar should be bool or instance of ProgressBar.
+If bar is False, no progress bar will be displayed.
+If bar is True, default progress bar will be displayed.
+If bar is ProgressBar instance, customized progress bar will be displayed.
 
 ### arg
 
@@ -219,6 +224,21 @@ Result of func(*ChainIter, *args, **kwargs)
 
 ## ProgressBar
 An container for progressbar.
+It is just like this
+
+```python
+class ProgressBar:
+    def __init__(self) -> None:
+        self.bar_str = '\r{percent}%[{bar}{arrow}{space}]{div}'
+        self.cycle_token = ('-', '\\', '|', '/')
+        self.cycle_str = '\r[{cycle}]'
+        self.stat_str = ' | {epoch_time:.2g}sec/epoch | Speed: {speed:.2g}/sec'
+        self.progress = self.bar_str + self.stat_str
+        self.cycle = self.cycle_str + self.stat_str
+        self.bar = '='
+        self.space = ' '
+        self.arrow = '>'
+```
 
 ## future(func:Callable) -> Callable
 Let coroutine return future object. It can be used as decorator.  

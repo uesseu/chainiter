@@ -5,7 +5,7 @@ It is iterator object package for me. Multiprocessing can be performed easily.
 Ofcourse, you can use it. This script cannot be harmful, but may be anti-pattern.  
 It can...
 
-- Use map, filter, and reduce by mechod chain.
+- Use map, filter, and reduce by method chain.
 - Calculate fast for a python code.
 - Show progress bar.
 - Performe parallel computing.

@@ -46,21 +46,20 @@ Multi processing and asyncio can run.
 
 ```python
 __init__(self, data:Iterable, indexable:bool=False, max_num:int=0,
-	 bar:bool=False, progressbar:ProgressBar=none)  
+	 bar:Optional[ProgressBar]=None)  
 ```
 
 #### Parameters  
 
-| arg       | type                           |                                                                                     |
-|-----------|--------------------------------|-------------------------------------------------------------------------------------|
-| data      | Iterable                       | It need not to be indexable.                                                        |
-| indexable | bool                           | If data is indexable, indexable should be True.                                     |
-| max_num   | int                            | Length of the iterator.                                                             |
-| bar       | Union[bool, ProgressBar] | Show progress bar. It is fancy, but may be slower. It cannot run with multiprocess. |
+| arg       | type                  |                                                                                     |
+|-----------|-----------------------|-------------------------------------------------------------------------------------|
+| data      | Iterable              | It need not to be indexable.                                                        |
+| indexable | bool                  | If data is indexable, indexable should be True.                                     |
+| max_num   | int                   | Length of the iterator.                                                             |
+| bar       | Optional[ProgressBar] | Show progress bar. It is fancy, but may be slower. It cannot run with multiprocess. |
 
 Bar should be bool or instance of ProgressBar.
-If bar is False, no progress bar will be displayed.
-If bar is True, default progress bar will be displayed.
+If bar is None, no progress bar will be displayed.
 If bar is ProgressBar instance, customized progress bar will be displayed.
 
 ### arg

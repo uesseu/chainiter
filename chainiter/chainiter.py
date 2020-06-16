@@ -137,7 +137,7 @@ class ChainIter:
     """
     def __init__(self, data: Union[list, Iterable],
                  indexable: bool = False, max_num: int = 0,
-                 bar: Union[bool, ProgressBar] = False):
+                 bar: Optional[ProgressBar] = None):
         """
         Parameters
         ----------
@@ -156,7 +156,7 @@ class ChainIter:
         self.data = data
         self.indexable = indexable
         self.num = 0  # Iterator needs number.
-        self.bar: Union[ProgressBar, bool]
+        self.bar: Optional[ProgressBar]
         if hasattr(data, '__len__'):
             self.max = len(cast(Sized, data))
         else:
@@ -503,7 +503,7 @@ class ChainIter:
         return self
 
     def len(self) -> int:
-        return len(self).get()
+        return len(self)
 
     def __lt__(self, arg: Any) -> list:
         return ChainIter(map(lambda x: x < arg, self.data)).get()

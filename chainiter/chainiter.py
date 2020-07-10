@@ -344,6 +344,52 @@ class ChainIter:
                                         ).get(timeout)
         return ChainIter(result, True, self.max, self.bar)
 
+    def async_pmap(self, *args, **kwargs) -> 'ChainIter':
+        """
+        Chainable map of coroutine, for example, async def function.
+
+        Parameters
+        ----------
+        func: Callable
+            Function to run.
+        core: int
+            Number of cpu cores.
+            If it is larger than 1, multiprocessing based on
+            multiprocessing.Pool will be run.
+            And so, If func cannot be lambda or coroutine if
+            it is larger than 1.
+        Returns
+        ---------
+        ChainIter with result
+        """
+        write_info(args[0])
+        return ChainIter(starmap(run_async,
+                         ((partial(*args, **kwargs), a) for a in self.data)),
+                          False, self.max, self.bar)
+
+    def async_pstarmap(self, *args, **kwargs) -> 'ChainIter':
+        """
+        Chainable starmap of coroutine, for example, async def function.
+
+        Parameters
+        ----------
+        func: Callable
+            Function to run.
+        core: int
+            Number of cpu cores.
+            If it is larger than 1, multiprocessing based on
+            multiprocessing.Pool will be run.
+            And so, If func cannot be lambda or coroutine if
+            it is larger than 1.
+        Returns
+        ---------
+        ChainIter with result
+        """
+        write_info(args[0])
+        return ChainIter(starmap(run_async,
+                         ((partial(*args, **kwargs), *a) for a in self.data)),
+                          False, self.max, self.bar)
+
     def has_index(self) -> bool:
         """
         Return whether it is indexable or not.

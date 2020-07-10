@@ -9,12 +9,17 @@ It can...
 - Calculate fast for a python code.
 - Show progress bar.
 - Performe parallel computing.
-- Run coroutines inparallel.
+- Run coroutines in parallel.
+- Make partial function and run in parallel.
 
 ## Is it fast for python?
 
-It is a package for me. I do'nt want slow one. It is based not on list but on iterators.  
-Ofcource, speed of python is slow. And so, I tried to minimize orverhead.  
+It is based not on list but on iterators.  
+I tried to minimize orverhead. And so, usually, it is as fast as iterators of python.  
+And so, It may be much faster than list in some cases.
+It is a package for me, and I do'nt want slow one ;).  
+
+Ofcource, speed of python is slow.  
 If you write a simple python code, it cannot be faster than numpy.  
 But calcurating by 1 process may be limited by IO, memory, and so on.  
 When it shows progress bar, it may be slow.  
@@ -25,13 +30,85 @@ When it shows progress bar, it may be slow.
 pip install git+http://github.com/uesseu/chainiter
 ```
 
-## Example
+## Example and basic usage
+
+- At first, define a function
+- Second, make ChainIter object and input a data
+- Make map by map method
+- Use calc method if you used lazy method
+- Finally, use get method and get the result
 
 ```python
 from chaniter import ChainIter
+
 def test(x):
     return x * 2
-ChainIter(range(50)).map(test).calc().get()
+
+result = ChainIter(range(50)).map(test).calc().get()
+```
+
+### Laze methods
+In ChainIter, lazy methods are
+
+- map(only when chunk size is not set)
+- starmap(only when chunk size is not set)
+- pmap
+- pstarmap
+- filter
+- zip
+- product
+
+
+It is chainable.
+
+```python
+def test(x):
+    return x * 2
+
+def filt_test(x):
+    x > 40
+
+result = ChainIter(range(50)).map(test).filter(filt_test).calc().get()
+```
+
+It can be used as iterator.
+
+```python
+def test(x):
+    return x * 2
+
+for n in ChainIter(range(50)).map(test):
+  print(n)
+```
+
+### Parallel computing
+Multi processing can be used easily.  
+In this case, use 2 cores.  
+
+```python
+def test(x):
+    return x * 2
+
+def filt_test(x):
+    x > 40
+
+result = ChainIter(range(50)).map(test).calc(2).get()
+```
+
+### Optional parallel computing
+
+map and filter method returns ChainIter object with lazy function,  
+but optionally, you can set chunk size and run in parallel.  
+If you use it, parallel computing will be performed immediately.  
+In this case, map will not be lazy function and calc method  
+will not be needed.  
+
+Perhaps, there are functions which needs lots of memory.  
+It may be useful if you want to change chunk size flexibly.  
+
+```python
+def test(x): return x * 2
+result = ChainIter(range(50)).map(test, 2).get() # chunk size=2
 ```
 
 ## CLASSES
@@ -152,6 +229,21 @@ ChainIter with result
 ChainIter([5, 6]).map(lambda x: x * 2).get()
 [10, 12]
 ```
+
+### pmap(self, *args, **kwargs) -> 'ChainIter'
+Chainable map with partial function.  
+In this case, ChainIter.data must be Iterator of iterable objects.  
+It applies partial, and it cannot apply parallel computation.  
+To apply parallelism, use calc() after apply it.  
+
+
+
+### pstarmap(self, *args, **kwargs) -> 'ChainIter'
+Chainable map with partial function.  
+In this case, ChainIter.data must be Iterator of iterable objects.  
+It applies partial, and it cannot apply parallel computation.  
+To apply parallelism, use calc() after apply it.  
+
 
 ### print(self) -> 'ChainIter'
 Just print the content.

@@ -1,3 +1,4 @@
+#cython: language_level=3
 from asyncio import new_event_loop, ensure_future, Future
 from typing import (Any, Callable, Iterable, cast, Coroutine,
                     Union, Sized, Optional)
@@ -10,7 +11,6 @@ from logging import getLogger
 from inspect import _empty, signature
 import time
 from threading import Thread
-
 logger = getLogger('ChainIter')
 
 
@@ -226,6 +226,51 @@ class ChainIter:
         with Pool(chunk) as pool:
             result = pool.starmap_async(func, self.data).get(timeout)
         return ChainIter(result, True, self.max, self.bar)
+
+    def pmap(self, *args, **kwargs) -> 'ChainIter':
+        """
+        Chainable map with partial function.
+        In this case, ChainIter.data must be Iterator of iterable objects.
+        It applies partial, and it cannot apply parallel computation.
+        To apply parallelism, use calc() after apply it.
+
+        Parameters
+        ----------
+        *args, **kwargs
+
+        Returns
+        ---------
+        ChainIter with result
+
+        >>> def multest2(x, y): return x * y
+        >>> ChainIter([5, 6]).pmap(multest, 2).get()
+        [10, 12]
+        """
+        write_info(args[0])
+        return ChainIter(map(partial(*args, **kwargs), self.data),
+                         False, self.max, self.bar)
+
+    def pstarmap(self, *args, **kwargs) -> 'ChainIter':
+        """
+        Chainable starmap with partial function.
+        In this case, ChainIter.data must be Iterator of iterable objects.
+        It applies partial, and it cannot apply parallel computation.
+        To apply parallelism, use calc() after apply it.
+
+        Parameters
+        ----------
+        *args, **kwargs
+
+        Returns
+        ---------
+        ChainIter with result
+        >>> def multest2(x, y, z): return x * y
+        >>> ChainIter([5, 6]).zip([2, 3]).pmap(multest, 2).get()
+        [20, 36]
+        """
+        write_info(args[0])
+        return ChainIter(starmap(partial(*args, **kwargs), self.data),
+                         False, self.max, self.bar)
 
     def filter(self, func: Callable) -> 'ChainIter':
         """

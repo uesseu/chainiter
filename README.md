@@ -92,7 +92,7 @@ def test(x):
 def filt_test(x):
     x > 40
 
-result = ChainIter(range(50)).map(test).calc(2).get()
+result = ChainIter(range(50)).map(test, 2).calc().get()
 ```
 
 ### Optional parallel computing
@@ -119,7 +119,7 @@ result = ChainIter(range(50)).map(test, 2).get() # chunk size=2
 Iterator which can used by method chain like Arry of node.js.  
 Multi processing and asyncio can run.  
 
-### Methods
+### init
 
 ```python
 __init__(self, data:Iterable, indexable:bool=False, max_num:int=0,
@@ -231,18 +231,45 @@ ChainIter([5, 6]).map(lambda x: x * 2).get()
 ```
 
 ### pmap(self, *args, **kwargs) -> 'ChainIter'
-Chainable map with partial function.  
-In this case, ChainIter.data must be Iterator of iterable objects.  
-It applies partial, and it cannot apply parallel computation.  
-To apply parallelism, use calc() after apply it.  
+Partial version of ChainIter.map. It does not return ChainIter object.
+It returns a function which returns ChainIter.
+Chainable starmap with partial function.
+At first, it makes partial function, and then, gets argument of ChainIter.
+
+#### Parameters  
+
+| arg     | type |                                         |
+|---------|------|-----------------------------------------|
+| core    | int  | Number of cores for parallel computing. |
+| timeout | int  | Timeout parameter of Pool.map.          |
+
+Returns
+A function which returns ChainIter with result
 
 
+```python
+def multest(x, y): return x * y
+ChainIter([5, 6]).pmap(4)(multest, 2).get()
+```
 
 ### pstarmap(self, *args, **kwargs) -> 'ChainIter'
-Chainable map with partial function.  
-In this case, ChainIter.data must be Iterator of iterable objects.  
-It applies partial, and it cannot apply parallel computation.  
-To apply parallelism, use calc() after apply it.  
+Partial version of ChainIter.starmap. It does not return ChainIter object.
+It returns a function which returns ChainIter.
+Chainable starmap with partial function.
+At first, it makes partial function, and then, gets argument of ChainIter.
+
+| arg     | type |                                         |
+|---------|------|-----------------------------------------|
+| core    | int  | Number of cores for parallel computing. |
+| timeout | int  | Timeout parameter of Pool.map.          |
+
+Returns
+A function which returns ChainIter with result
+
+```python
+def multest(x, y, z): return x * y * z
+ChainIter(zip([5, 6], [1, 3])).pstarmap(4)(multest, 2).get()
+```
 
 
 ### print(self) -> 'ChainIter'
@@ -299,6 +326,48 @@ ChainIter with result
 def multest2(x, y): return x * y
 ChainIter([5, 6]).zip([2, 3]).starmap(multest2).get()
 [10, 18]
+```
+
+
+### async_pmap(self, chunk: int = 1, timeout: Optional[float] = None) -> Callable:
+Partial version of ChainIter.async_map.
+It does not return ChainIter object.
+It returns a function which returns ChainIter.
+Chainable starmap with partial function.
+At first, it makes partial function,
+and then, gets argument of ChainIter.
+
+| arg     | type |                                         |
+|---------|------|-----------------------------------------|
+| core    | int  | Number of cores for parallel computing. |
+| timeout | int  | Timeout parameter of Pool.map.          |
+
+Returns
+A function which returns ChainIter with result
+
+```python
+async def multest2(x, y, z): return x * y * z
+ChainIter([5, 6]).async_pmap(multest2, 2, 3)().get()
+```
+
+### async_pstarmap(self, chunk: int = 1, timeout: Optional[float] = None) -> Callable:
+Partial version of ChainIter.async_starmap.
+It does not return ChainIter object.
+It returns a function which returns ChainIter.
+At first, it makes partial function,
+and then, gets argument of ChainIter.
+
+| arg     | type |                                         |
+|---------|------|-----------------------------------------|
+| core    | int  | Number of cores for parallel computing. |
+| timeout | int  | Timeout parameter of Pool.map.          |
+
+Returns
+ChainIter with result
+
+```python
+async def multest2(x, y, z): return x * y * z
+ChainIter([5, 6]).zip([2, 3]).async_pstarmap()(multest2, 2).get()
 ```
 
 ### zip(self, *args:Iterable) -> 'ChainIter'

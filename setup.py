@@ -7,7 +7,7 @@ setup(
     name="chainiter",  # Replace with your own username
     author="ninja",
     author_email="sheepwing@kyudai.jp",
-    description="My iterator object.",
+    description="Iterator which can use multicore, method chain, coroutine, and progress bar.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/uesseu/chainiter",

@@ -1,4 +1,3 @@
-#cython: language_level=3
 from asyncio import new_event_loop, ensure_future, Future
 from typing import (Any, Callable, Iterable, cast, Coroutine,
                     Union, Sized, Optional)
@@ -7,13 +6,14 @@ from collections import namedtuple
 from multiprocessing import Pool
 from doctest import testmod
 from functools import reduce, wraps, partial
-from logging import getLogger
+from logging import getLogger, Logger, NullHandler, StreamHandler
 from inspect import _empty, signature
 import os
 from contextlib import redirect_stdout
 import time
 from threading import Thread
-logger = getLogger('ChainIter')
+logger = getLogger('chainiter')
+logger.addHandler(NullHandler())
 
 
 def compose(*funcs: Callable) -> Callable:
@@ -66,11 +66,13 @@ def curry(num_of_args: Optional[int] = None) -> Callable:
     return curry_wrap
 
 
-def write_info(func: Callable) -> None:
+def write_info(func: Callable, chunk: int = 1, logger: Logger = logger) -> None:
     if hasattr(func, '__name__'):
         logger.info(' '.join(('Running', str(func.__name__))))
     else:
         logger.info('Running something without name.')
+    if chunk > 1:
+        logger.info(f'Computing by {chunk} processes!')
 
 
 class ProgressBar:
@@ -169,9 +171,9 @@ class ChainIter:
             self.bar = bar
         self.bar_len = 30
 
-    def map(self, func: Callable, core: int = 1,
+    def map(self, func: Callable, chunk: int = 1,
             timeout: Optional[float] = None,
-            _as_frontend: bool = False) -> 'ChainIter':
+            logger: Logger = logger) -> 'ChainIter':
         """
         Chainable map.
 
@@ -192,17 +194,16 @@ class ChainIter:
         >>> ChainIter([5, 6]).map(lambda x: x * 2).get()
         [10, 12]
         """
-        if _as_frontend:
-            write_info(func)
-        if (core == 1):
+        write_info(func, chunk, logger)
+        if (chunk == 1):
             return ChainIter(map(func, self.data), False, self.max, self.bar)
-        with Pool(core) as pool:
+        with Pool(chunk) as pool:
             result = pool.map_async(func, self.data).get(timeout)
         return ChainIter(result, True, self.max, self.bar)
 
     def starmap(self, func: Callable, chunk: int = 1,
                 timeout: Optional[float] = None,
-                _as_frontend: bool = False) -> 'ChainIter':
+                logger: Logger = logger) -> 'ChainIter':
         """
         Chainable starmap.
         In this case, ChainIter.data must be Iterator of iterable objects.
@@ -224,8 +225,7 @@ class ChainIter:
         >>> ChainIter([5, 6]).zip([2, 3]).starmap(multest2).get()
         [10, 18]
         """
-        if _as_frontend:
-            write_info(func)
+        write_info(func, chunk, logger)
         if chunk == 1:
             return ChainIter(starmap(func, self.data),
                              False, self.max, self.bar)
@@ -233,7 +233,8 @@ class ChainIter:
             result = pool.starmap_async(func, self.data).get(timeout)
         return ChainIter(result, True, self.max, self.bar)
 
-    def pmap(self, core: int = 1, timeout: Optional[float] = None) -> Callable:
+    def pmap(self, chunk: int = 1, timeout: Optional[float] = None,
+             logger: Logger = logger) -> Callable:
         """
         Partial version of ChainIter.map. It does not return ChainIter object.
         It returns a function which returns ChainIter.
@@ -256,11 +257,12 @@ class ChainIter:
         [10, 12]
         """
         def wrap(*args, **kwargs) -> 'ChainIter':
-            write_info(args[0])
-            return self.map(partial(*args, **kwargs), core, timeout, False)
+            write_info(args[0], chunk, logger)
+            return self.map(partial(*args, **kwargs), chunk, timeout, logger)
         return wrap
 
-    def pstarmap(self, chunk: int = 1, timeout: Optional[float] = None) -> Callable:
+    def pstarmap(self, chunk: int = 1, timeout: Optional[float] = None,
+                 logger: Logger = logger) -> Callable:
         """
         Partial version of ChainIter.starmap. It does not return ChainIter object.
         It returns a function which returns ChainIter.
@@ -282,11 +284,12 @@ class ChainIter:
         [10, 36]
         """
         def wrap(*args, **kwargs) -> 'ChainIter':
-            write_info(args[0])
-            return self.starmap(partial(*args, **kwargs), chunk, timeout, False)
+            write_info(args[0], chunk, logger)
+            return self.starmap(partial(*args, **kwargs),
+                                chunk, timeout, logger)
         return wrap
 
-    def filter(self, func: Callable) -> 'ChainIter':
+    def filter(self, func: Callable, logger: Logger = logger) -> 'ChainIter':
         """
         Simple filter function.
         It kills progress bar.
@@ -295,10 +298,10 @@ class ChainIter:
         ----------
         func: Callable
         """
-        write_info(func)
+        write_info(func, 1, logger)
         return ChainIter(filter(func, self.data), False, 0, self.bar)
 
-    def pfilter(self, *args, **kwargs) -> 'ChainIter':
+    def pfilter(self, *args, logger: Logger = logger, **kwargs) -> 'ChainIter':
         """
         Simple filter function.
         It kills progress bar.
@@ -307,12 +310,12 @@ class ChainIter:
         ----------
         func: Callable
         """
-        write_info(args[0])
+        write_info(args[0], 1, logger)
         return ChainIter(filter(partial(*args, **kwargs), self.data), False, 0, self.bar)
 
     def async_map(self, func: Callable, chunk: int = 1,
                   timeout: Optional[float] = None,
-                  _as_frontend: bool = True) -> 'ChainIter':
+                  logger: Logger = logger) -> 'ChainIter':
         """
         Chainable map of coroutine, for example, async def function.
 
@@ -333,8 +336,7 @@ class ChainIter:
         >>> ChainIter(zip([5, 6], [1, 3])).async_pstarmap()(multest, 2).get()
         [10, 36]
         """
-        if _as_frontend:
-            write_info(func)
+        write_info(func, chunk, logger)
         if chunk == 1:
             return ChainIter(
                 starmap(run_async, ((func, a) for a in self.data)),
@@ -347,7 +349,7 @@ class ChainIter:
 
     def async_starmap(self, func: Callable, chunk: int = 1,
                       timeout: Optional[float] = None,
-                      _as_frontend: bool = True) -> 'ChainIter':
+                      logger: Logger = logger) -> 'ChainIter':
         """
         Chainable starmap of coroutine, for example, async def function.
 
@@ -368,8 +370,7 @@ class ChainIter:
         >>> ChainIter(zip([5, 6], [1, 3])).pstarmap()(multest, 2).get()
         [10, 36]
         """
-        if _as_frontend:
-            write_info(func)
+        write_info(func, chunk, logger)
         if chunk == 1:
             return ChainIter(
                 starmap(run_async, ((func, *a) for a in self.data)),
@@ -380,7 +381,8 @@ class ChainIter:
         return ChainIter(result, True, self.max, self.bar)
 
     def async_pmap(self, chunk: int = 1,
-                   timeout: Optional[float] = None) -> Callable:
+                   timeout: Optional[float] = None,
+                   logger: Logger = logger) -> Callable:
         """
         Partial version of ChainIter.async_map.
         It does not return ChainIter object.
@@ -404,12 +406,13 @@ class ChainIter:
         [30, 36]
         """
         def wrap(*args, **kwargs) -> 'ChainIter':
-            write_info(args[0])
+            write_info(args[0], chunk, logger)
             return self.async_map(partial(*args, **kwargs),
-                                  chunk, timeout, False)
+                                  chunk, timeout, logger)
         return wrap
 
-    def async_pstarmap(self, chunk: int = 1, timeout: Optional[float] = None) -> Callable:
+    def async_pstarmap(self, chunk: int = 1, timeout: Optional[float] = None,
+                       logger: Logger = logger) -> Callable:
         """
         Partial version of ChainIter.async_starmap.
         It does not return ChainIter object.
@@ -432,9 +435,9 @@ class ChainIter:
         [20, 36]
         """
         def wrap(*args, **kwargs) -> 'ChainIter':
-            write_info(args[0])
+            write_info(args[0], chunk, logger)
             return self.async_starmap(partial(*args, **kwargs),
-                                      chunk, timeout, False)
+                                      chunk, timeout, logger)
         return wrap
 
     def has_index(self) -> bool:
@@ -449,7 +452,7 @@ class ChainIter:
         self.data = tuple(self.data)
         return self.data[num]
 
-    def reduce(self, func: Callable) -> Any:
+    def reduce(self, func: Callable, logger: Logger = logger) -> Any:
         """
         Simple reduce function.
 
@@ -461,7 +464,7 @@ class ChainIter:
         ----------
         Result of reduce.
         """
-        write_info(func)
+        write_info(func, 1, logger)
         return reduce(func, self.data)
 
     def get(self, kind: type = list) -> Any:
@@ -599,7 +602,7 @@ class ChainIter:
         ----------
         ChainIter object with result.
         """
-        if self.bar and not self.indexable:
+        if isinstance(self.bar, ProgressBar) and not self.indexable:
             res = []
             start_time = current_time = time.time()
             for n, v in enumerate(self.data):
@@ -667,6 +670,13 @@ class ChainIter:
         Just print the content.
         """
         print(self.data)
+        return self
+
+    def print_len(self) -> 'ChainIter':
+        """
+        Just print length of the content.
+        """
+        print(len(list(self.data)))
         return self
 
 

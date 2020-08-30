@@ -215,6 +215,11 @@ ChainIter object with result.
 ### filter(self, func:Callable, logger: logging.Logger) -> 'ChainIter'
 Simple filter function.  
 It kills progress bar.  
+
+### pfilter(self, *args, logger: logging.Logger, **kwargs) -> 'ChainIter'
+Partial version of filter function.  
+It kills progress bar.  
+pmap returns function, but pfilter returns chainiter.  
   
 #### Parameters  
 func: Callable  

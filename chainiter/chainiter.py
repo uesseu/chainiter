@@ -6,7 +6,8 @@ from collections import namedtuple
 from multiprocessing import Pool
 from doctest import testmod
 from functools import reduce, wraps, partial
-from logging import getLogger, Logger, NullHandler, StreamHandler
+from logging import (getLogger, Logger, NullHandler, StreamHandler,
+                     INFO, WARNING, ERROR, CRITICAL)
 from inspect import _empty, signature
 import os
 from contextlib import redirect_stdout
@@ -67,6 +68,9 @@ def curry(num_of_args: Optional[int] = None) -> Callable:
 
 
 def write_info(func: Callable, chunk: int = 1, logger: Logger = logger) -> None:
+    """
+    Log displayer of chainiter.
+    """
     if hasattr(func, '__name__'):
         logger.info(' '.join(('Running', str(func.__name__))))
     else:
@@ -76,6 +80,32 @@ def write_info(func: Callable, chunk: int = 1, logger: Logger = logger) -> None:
 
 
 class ProgressBar:
+    """
+    A configuration object of progressbar for chainiter.
+    There are some parameters of progress bar.
+
+    percent: Percent of progress bar.
+    bar: Body of bar.
+    arrow: Top of bar.
+    space: Un reached space of bar.
+    div: The end of space.
+    cycle: Cycle style counter.
+    epoch_time: Time spent by one epoch.
+    speed: Speed of processing.
+
+    Default value is below.
+
+    self.bar_str = '\r{percent}%[{bar}{arrow}{space}]{div}'
+    self.cycle_token = ('-', '\\', '|', '/')
+    self.cycle_str = '\r[{cycle}]'
+    self.stat_str = ' | {epoch_time:.2g}sec/epoch | Speed: {speed:.2g}/sec'
+    self.progress = self.bar_str + self.stat_str
+    self.cycle = self.cycle_str + self.stat_str
+    self.bar = '='
+    self.space = ' '
+    self.arrow = '>'
+    """
+
     def __init__(self) -> None:
         self.bar_str = '\r{percent}%[{bar}{arrow}{space}]{div}'
         self.cycle_token = ('-', '\\', '|', '/')
@@ -181,12 +211,16 @@ class ChainIter:
         ----------
         func: Callable
             Function to run.
-        core: int
+        chunk: int
             Number of cpu cores.
             If it is larger than 1, multiprocessing based on
-            multiprocessing.Pool will be run.
+            multiprocessing.Pool will run.
             And so, If func cannot be lambda or coroutine if
             it is larger than 1.
+        timeout: Optional[float] = None
+            Time to stop parallel computing.
+        logger: logging.Logger
+            Your favorite logger.
         Returns
         ---------
         ChainIter with result
@@ -212,12 +246,16 @@ class ChainIter:
         ----------
         func: Callable
             Function to run.
-        core: int
+        chunk: int
             Number of cpu cores.
             If it is larger than 1, multiprocessing based on
             multiprocessing.Pool will be run.
             And so, If func cannot be lambda or coroutine if
             it is larger than 1.
+        timeout: Optional[float] = None
+            Time to stop parallel computing.
+        logger: logging.Logger
+            Your favorite logger.
         Returns
         ---------
         ChainIter with result
@@ -243,10 +281,12 @@ class ChainIter:
 
         Parameters
         ----------
-        core: int
+        chunk: int
             Number of cores for parallel computing.
-        timeout: int
-            Timeout parameter of Pool.map.
+        timeout: Optional[float] = None
+            Time to stop parallel computing.
+        logger: logging.Logger
+            Your favorite logger.
 
         Returns
         ---------
@@ -257,6 +297,25 @@ class ChainIter:
         [10, 12]
         """
         def wrap(*args, **kwargs) -> 'ChainIter':
+            """
+            Chainable map.
+
+            Parameters
+            ----------
+            func: Callable
+                Function to run.
+            chunk: int
+                Number of cpu cores.
+                If it is larger than 1, multiprocessing based on
+                multiprocessing.Pool will run.
+                And so, If func cannot be lambda or coroutine if
+                it is larger than 1.
+            timeout: Optional[float] = None
+                Time to stop parallel computing.
+            Returns
+            ---------
+            ChainIter with result
+            """
             write_info(args[0], chunk, logger)
             return self.map(partial(*args, **kwargs), chunk, timeout, logger)
         return wrap
@@ -271,10 +330,12 @@ class ChainIter:
 
         Parameters
         ----------
-        core: int
+        chunk: int
             Number of cores for parallel computing.
-        timeout: int
-            Timeout parameter of Pool.map.
+        timeout: Optional[float] = None
+            Time to stop parallel computing.
+        logger: logging.Logger
+            Your favorite logger.
 
         Returns
         ---------
@@ -284,6 +345,26 @@ class ChainIter:
         [10, 36]
         """
         def wrap(*args, **kwargs) -> 'ChainIter':
+            """
+            Chainable starmap.
+            In this case, ChainIter.data must be Iterator of iterable objects.
+
+            Parameters
+            ----------
+            func: Callable
+                Function to run.
+            chunk: int
+                Number of cpu cores.
+                If it is larger than 1, multiprocessing based on
+                multiprocessing.Pool will be run.
+                And so, If func cannot be lambda or coroutine if
+                it is larger than 1.
+            timeout: Optional[float] = None
+                Time to stop parallel computing.
+            Returns
+            ---------
+            ChainIter with result
+            """
             write_info(args[0], chunk, logger)
             return self.starmap(partial(*args, **kwargs),
                                 chunk, timeout, logger)
@@ -297,6 +378,8 @@ class ChainIter:
         Parameters
         ----------
         func: Callable
+        logger: logging.Logger
+            Your favorite logger.
         """
         write_info(func, 1, logger)
         return ChainIter(filter(func, self.data), False, 0, self.bar)
@@ -309,6 +392,8 @@ class ChainIter:
         Parameters
         ----------
         func: Callable
+        logger: logging.Logger
+            Your favorite logger.
         """
         write_info(args[0], 1, logger)
         return ChainIter(filter(partial(*args, **kwargs), self.data), False, 0, self.bar)
@@ -323,12 +408,16 @@ class ChainIter:
         ----------
         func: Callable
             Function to run.
-        core: int
+        chunk: int
             Number of cpu cores.
             If it is larger than 1, multiprocessing based on
             multiprocessing.Pool will be run.
             And so, If func cannot be lambda or coroutine if
             it is larger than 1.
+        timeout: Optional[float] = None
+            Time to stop parallel computing.
+        logger: logging.Logger
+            Your favorite logger.
         Returns
         ---------
         ChainIter with result
@@ -357,12 +446,16 @@ class ChainIter:
         ----------
         func: Callable
             Function to run.
-        core: int
+        chunk: int
             Number of cpu cores.
             If it is larger than 1, multiprocessing based on
             multiprocessing.Pool will be run.
             And so, If func cannot be lambda or coroutine if
             it is larger than 1.
+        timeout: Optional[float] = None
+            Time to stop parallel computing.
+        logger: logging.Logger
+            Your favorite logger.
         Returns
         ---------
         ChainIter with result
@@ -393,10 +486,12 @@ class ChainIter:
 
         Parameters
         ----------
-        core: int
+        chunk: int
             Number of cores for parallel computing.
-        timeout: int
-            Timeout parameter of Pool.map.
+        timeout: Optional[float] = None
+            Time to stop parallel computing.
+        logger: logging.Logger
+            Your favorite logger.
 
         Returns
         ---------
@@ -406,6 +501,25 @@ class ChainIter:
         [30, 36]
         """
         def wrap(*args, **kwargs) -> 'ChainIter':
+            """
+            Chainable map of coroutine, for example, async def function.
+
+            Parameters
+            ----------
+            func: Callable
+                Function to run.
+            chunk: int
+                Number of cpu cores.
+                If it is larger than 1, multiprocessing based on
+                multiprocessing.Pool will be run.
+                And so, If func cannot be lambda or coroutine if
+                it is larger than 1.
+            timeout: Optional[float] = None
+                Time to stop parallel computing.
+            Returns
+            ---------
+            ChainIter with result
+            """
             write_info(args[0], chunk, logger)
             return self.async_map(partial(*args, **kwargs),
                                   chunk, timeout, logger)
@@ -422,10 +536,12 @@ class ChainIter:
 
         Parameters
         ----------
-        core: int
+        chunk: int
             Number of cores for parallel computing.
         timeout: int
             Timeout parameter of Pool.map.
+        logger: logging.Logger
+            Your favorite logger.
 
         Returns
         ---------
@@ -435,6 +551,25 @@ class ChainIter:
         [20, 36]
         """
         def wrap(*args, **kwargs) -> 'ChainIter':
+            """
+            Chainable starmap of coroutine, for example, async def function.
+
+            Parameters
+            ----------
+            func: Callable
+                Function to run.
+            chunk: int
+                Number of cpu cores.
+                If it is larger than 1, multiprocessing based on
+                multiprocessing.Pool will be run.
+                And so, If func cannot be lambda or coroutine if
+                it is larger than 1.
+            timeout: Optional[float] = None
+                Time to stop parallel computing.
+            Returns
+            ---------
+            ChainIter with result
+            """
             write_info(args[0], chunk, logger)
             return self.async_starmap(partial(*args, **kwargs),
                                       chunk, timeout, logger)
@@ -459,6 +594,8 @@ class ChainIter:
         Parameters
         ----------
         func: Callable
+        logger: logging.Logger
+            Your favorite logger.
 
         Returns
         ----------
@@ -670,6 +807,20 @@ class ChainIter:
         Just print the content.
         """
         print(self.data)
+        return self
+
+    def log(self, logger: Logger = logger, level: int = INFO) -> 'ChainIter':
+        """
+        Just print the content.
+        """
+        if level == INFO:
+            logger.info(self.data)
+        elif level == WARNING:
+            logger.warning(self.data)
+        elif level == ERROR:
+            logger.error(self.data)
+        elif level == CRITICAL:
+            logger.critical(self.data)
         return self
 
     def print_len(self) -> 'ChainIter':

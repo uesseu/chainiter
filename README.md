@@ -1,16 +1,18 @@
 # ChainIter
 ## What is this?
 
-It is iterator object package for me. Multiprocessing can be performed easily.  
-Ofcourse, you can use it. This script cannot be harmful, but may be anti-pattern.  
+This is an iterator object package. Multiprocessing can be performed easily.  
 It can...
 
-- Use map, filter, and reduce by method chain.
+- Use map, filter, and reduce by method chain like Node.js.
 - Calculate fast for a python code.
-- Show progress bar.
 - Performe parallel computing.
+- Show progress bar(Only when without parallel computing).
 - Run coroutines in parallel.
+  + Ofcource, it can run asyncroniously!
 - Make partial function and run in parallel.
+
+But be careful! It may be anti pattern, because of god class!
 
 ## Is it fast for python?
 
@@ -27,11 +29,13 @@ When it shows progress bar, it may be slow.
 ## install
 
 ```bash
-pip install git+http://github.com/uesseu/chainiter
+pip install chainiter
 ```
 
 ## Example and basic usage
+It can run normal ans async functions.  
 
+### Normal functions
 - At first, define a function
 - Second, make ChainIter object and input a data
 - Make map by map method
@@ -47,11 +51,32 @@ def test(x):
 result = ChainIter(range(50)).map(test).calc().get()
 ```
 
+### Async functions
+- At first, define a async function
+- Second, make ChainIter object and input a data
+- Make map by async_map method
+- Use calc method if you used lazy method
+- Finally, use get method and get the result
+
+```python
+from chaniter import ChainIter
+import asyncio
+
+async def test(x):
+    asyncio.sleep(10)
+    await asyncio.sleep(10)
+    return x * 2
+
+result = ChainIter(range(50)).async_map(test).calc().get()
+```
+
+And, you can see, it run asyncroniously.  
+
 ### Lazy methods
 In ChainIter, lazy methods are
 
-- map(only when chunk size is not set)
-- starmap(only when chunk size is not set)
+- map(only when chunk size is 1 or not set)
+- starmap(only when chunk size is 1 or not set)
 - pmap
 - pstarmap
 - filter
@@ -71,7 +96,7 @@ def filt_test(x):
 result = ChainIter(range(50)).map(test).filter(filt_test).calc().get()
 ```
 
-It can be used as iterator.
+It can be used as iterator in for statement.
 
 ```python
 def test(x):
@@ -83,7 +108,14 @@ for n in ChainIter(range(50)).map(test):
 
 ### Parallel computing
 Multi processing can be used easily.  
+Map and filter method returns ChainIter object with lazy function,  
+but, if you set chunk size, it can not be lazy.  
+If you use it, parallel computing will be performed immediately.  
+When parallel computing is performed, calc method is not be needed.  
+But even if calc method is not needed, you can call calc method without overhead.  
+
 In this case, use 2 cores.  
+'map(test, 2)' lets test run by 2 cores.  
 
 ```python
 def test(x):
@@ -94,14 +126,6 @@ def filt_test(x):
 
 result = ChainIter(range(50)).map(test, 2).calc().get()
 ```
-
-### Optional parallel computing
-
-map and filter method returns ChainIter object with lazy function,  
-but optionally, you can set chunk size and run in parallel.  
-If you use it, parallel computing will be performed immediately.  
-In this case, map will not be lazy function and calc method  
-will not be needed.  
 
 Perhaps, there are functions which needs lots of memory.  
 It may be useful if you want to change chunk size flexibly.  
@@ -128,16 +152,16 @@ __init__(self, data:Iterable, indexable:bool=False, max_num:int=0,
 
 #### Parameters  
 
-| arg       | type                  |                                                                                     |
-|-----------|-----------------------|-------------------------------------------------------------------------------------|
-| data      | Iterable              | It need not to be indexable.                                                        |
-| indexable | bool                  | If data is indexable, indexable should be True.                                     |
-| max_num   | int                   | Length of the iterator.                                                             |
-| bar       | Optional[ProgressBar] | Show progress bar. It is fancy, but may be slower. It cannot run with multiprocess. |
+| arg       | type                  |                                                                               |
+|-----------|-----------------------|-------------------------------------------------------------------------------|
+| data      | Iterable              | It need not to be indexable.                                                  |
+| indexable | bool                  | If data is indexable, indexable should be True.                               |
+| max_num   | int                   | Length of the iterator.                                                       |
+| bar       | Optional[ProgressBar] | Show progress bar. Fancy, but little slower. It cannot run with multiprocess. |
 
-Bar should be bool or instance of ProgressBar.
-If bar is None, no progress bar will be displayed.
-If bar is ProgressBar instance, customized progress bar will be displayed.
+Bar should be bool or instance of ProgressBar.  
+If bar is None, no progress bar will be displayed.  
+If bar is ProgressBar instance, customized progress bar will be displayed.  
 
 ### arg
 
@@ -145,7 +169,7 @@ If bar is ProgressBar instance, customized progress bar will be displayed.
 arg(self, func:Callable, *args:Any, **kwargs:Any) -> Any
 ```
 
-Use ChainIter object as argument.  
+Use ChainIter object as arguments of function.  
 It is same as func(*ChainIter, *args, **kwargs)  
 
 #### Parameters  
@@ -165,12 +189,14 @@ ChainIter([5, 6]).arg(sum)
 Chainable map of coroutine, for example, async def function.  
 
 #### Parameters  
-| arg  | type     |                      |
-|------|----------|----------------------|
-| func | Callable | Function to run.     |
-| core | int      | Number of cpu cores. |
+| arg     | type                   |                                  |
+|---------|------------------------|----------------------------------|
+| func    | Callable               | Function to run.                 |
+| chunk   | int = 1                | Number of cpu cores.             |
+| timeout | Optional[float] = None | Time to stop parallel computing. |
+| logger  | logging.Logger         | Your favorite logger.            |
 
-If "cores" is larger than 1, multiprocessing based on
+If "chunk" is larger than 1, multiprocessing based on
 multiprocessing.Pool will be run.  
 And so, If func cannot be lambda or coroutine if  
 it is larger than 1.  
@@ -186,7 +212,7 @@ If you do not run in parallel, it can print progress bar.
 #### Returns  
 ChainIter object with result.  
 
-### filter(self, func:Callable) -> 'ChainIter'
+### filter(self, func:Callable, logger: logging.Logger) -> 'ChainIter'
 Simple filter function.  
 It kills progress bar.  
   
@@ -197,9 +223,9 @@ func: Callable
 Get data as list.
 
 #### Parameters
-| arg  | type     |                 |
-|------|----------|-----------------|
-| kind | Callable | Kind of output. |
+| arg        | type     |                 |
+|------------|----------|-----------------|
+| cores kind | Callable | Kind of output. |
 
 If you want to convert to object which is not list,
 you can set it. For example, tuple, dqueue, and so on.
@@ -208,14 +234,16 @@ you can set it. For example, tuple, dqueue, and so on.
 
 #### Return whether it is indexable or not.
 
-### map(self, func:Callable, core:int=1) -> 'ChainIter'
+### map(self, func:Callable, chunk:int=1) -> 'ChainIter'
 Chainable map.  
   
 #### Parameters  
-| arg  | type     |                      |
-|------|----------|----------------------|
-| func | Callable | Function to run.     |
-| core | int      | Number of cpu cores. |
+| arg     | type                   |                                  |
+|---------|------------------------|----------------------------------|
+| func    | Callable               | Function to run.                 |
+| chunk   | int=1                  | Number of cpu cores.             |
+| timeout | Optional[float] = None | Time to stop parallel computing. |
+| logger  | logging.Logger         | Your favorite logger.            |
 
 If it is larger than 1, multiprocessing based on  
 multiprocessing.Pool will be run.  
@@ -230,7 +258,7 @@ ChainIter([5, 6]).map(lambda x: x * 2).get()
 [10, 12]
 ```
 
-### pmap(self, *args, **kwargs) -> 'ChainIter'
+### pmap(self, chunk: int = 1, timeout:Optional[float] = None, logger: Logger = logger) -> 'ChainIter'
 Partial version of ChainIter.map. It does not return ChainIter object.
 It returns a function which returns ChainIter.
 Chainable starmap with partial function.
@@ -238,10 +266,11 @@ At first, it makes partial function, and then, gets argument of ChainIter.
 
 #### Parameters  
 
-| arg     | type |                                         |
-|---------|------|-----------------------------------------|
-| core    | int  | Number of cores for parallel computing. |
-| timeout | int  | Timeout parameter of Pool.map.          |
+| arg     | type           |                                         |
+|---------|----------------|-----------------------------------------|
+| chunk   | int            | Number of cores for parallel computing. |
+| timeout | int            | Time to stop parallel computing.        |
+| logger  | logging.Logger | Your favorite logger.                   |
 
 Returns
 A function which returns ChainIter with result
@@ -252,16 +281,17 @@ def multest(x, y): return x * y
 ChainIter([5, 6]).pmap(4)(multest, 2).get()
 ```
 
-### pstarmap(self, *args, **kwargs) -> 'ChainIter'
+### pstarpmap(self, chunk: int = 1, timeout:Optional[float] = None, logger: Logger = logger) -> 'ChainIter'
 Partial version of ChainIter.starmap. It does not return ChainIter object.
 It returns a function which returns ChainIter.
 Chainable starmap with partial function.
 At first, it makes partial function, and then, gets argument of ChainIter.
 
-| arg     | type |                                         |
-|---------|------|-----------------------------------------|
-| core    | int  | Number of cores for parallel computing. |
-| timeout | int  | Timeout parameter of Pool.map.          |
+| arg     | type           |                                         |
+|---------|----------------|-----------------------------------------|
+| chunk   | int            | Number of cores for parallel computing. |
+| timeout | int            | Time to stop parallel computing.        |
+| logger  | logging.Logger | Your favorite logger.                   |
 
 Returns
 A function which returns ChainIter with result
@@ -273,8 +303,12 @@ ChainIter(zip([5, 6], [1, 3])).pstarmap(4)(multest, 2).get()
 
 
 ### print(self) -> 'ChainIter'
-Just print the content.
-Returns self.
+Just print the content. Returns self.  
+It is based on print function.  
+If you prefer logging tool, use log function.  
+
+### log(self, logger: logging.Logger, level: int = logging.INFO) -> 'ChainIter'
+Use logger and write log.
 
 ### reduce(self, func:Callable) -> Any
 Simple reduce function.  
@@ -304,15 +338,18 @@ ChainIter([5, 6]).stararg(lambda x, y: x * y)
 30
 ```
 
-### starmap(self, func:Callable, core:int=1) -> 'ChainIter'
+### starmap(self, func:Callable, chunk:int=1, timeout: Optional[float], logger: logging.Logger = logger, *args) -> 'ChainIter'
 Chainable starmap.  
 In this case, ChainIter.data must be Iterator of iterable objects.  
   
 #### Parameters  
-| arg  | type     |                      |
-|------|----------|----------------------|
-| func | Callable | Function to run.     |
-| core | int      | Number of cpu cores. |
+| arg     | type           |                                         |
+|---------|----------------|-----------------------------------------|
+| func    | Callable       | Function to run.                        |
+| chunk   | int            | Number of cores for parallel computing. |
+| timeout | float          | Time to stop parallel computing.        |
+| logger  | logging.Logger | Your favorite logger.                   |
+| arg     | type           |                                         |
 
 If 'core' is larger than 1, multiprocessing based on  
 multiprocessing.Pool will be run.  
@@ -329,7 +366,7 @@ ChainIter([5, 6]).zip([2, 3]).starmap(multest2).get()
 ```
 
 
-### async_pmap(self, chunk: int = 1, timeout: Optional[float] = None) -> Callable:
+### async_pmap(self, chunk:int=1, timeout: Optional[float], logger: logging.Logger = logger, *args) -> Callable:
 Partial version of ChainIter.async_map.
 It does not return ChainIter object.
 It returns a function which returns ChainIter.
@@ -337,10 +374,12 @@ Chainable starmap with partial function.
 At first, it makes partial function,
 and then, gets argument of ChainIter.
 
-| arg     | type |                                         |
-|---------|------|-----------------------------------------|
-| core    | int  | Number of cores for parallel computing. |
-| timeout | int  | Timeout parameter of Pool.map.          |
+| arg     | type           |                                         |
+|---------|----------------|-----------------------------------------|
+| chunk   | int            | Number of cores for parallel computing. |
+| timeout | float          | Time to stop parallel computing.        |
+| logger  | logging.Logger | Your favorite logger.                   |
+| arg     | type           |                                         |
 
 Returns
 A function which returns ChainIter with result
@@ -350,17 +389,19 @@ async def multest2(x, y, z): return x * y * z
 ChainIter([5, 6]).async_pmap(multest2, 2, 3)().get()
 ```
 
-### async_pstarmap(self, chunk: int = 1, timeout: Optional[float] = None) -> Callable:
+### async_pstarmap(self, chunk:int=1, timeout: Optional[float], logger: logging.Logger = logger, *args) -> Callable:
 Partial version of ChainIter.async_starmap.
 It does not return ChainIter object.
 It returns a function which returns ChainIter.
 At first, it makes partial function,
 and then, gets argument of ChainIter.
 
-| arg     | type |                                         |
-|---------|------|-----------------------------------------|
-| core    | int  | Number of cores for parallel computing. |
-| timeout | int  | Timeout parameter of Pool.map.          |
+| arg     | type           |                                         |
+|---------|----------------|-----------------------------------------|
+| chunk   | int            | Number of cores for parallel computing. |
+| timeout | float          | Time to stop parallel computing.        |
+| logger  | logging.Logger | Your favorite logger.                   |
+| arg     | type           |                                         |
 
 Returns
 ChainIter with result

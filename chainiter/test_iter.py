@@ -1,6 +1,7 @@
 from chainiter import ChainIter, future, ProgressBar, curry, logger
 from doctest import testmod
 from time import sleep, time
+import asyncio
 from logging import getLogger, basicConfig, INFO, WARNING, StreamHandler
 from itertools import product
 basicConfig(level=INFO)
@@ -36,6 +37,10 @@ def titest(x: int) -> int:
     sleep(0.05)
     return x * 2
 
+async def async_titest(x: int) -> int:
+    asyncio.sleep(0.05)
+    await asyncio.sleep(0.05)
+    return x * 2
 
 ####################
 # Speed test
@@ -50,6 +55,18 @@ def speed_test():
     print(time() - current)
 ####################
 
+####################
+# Async speed test
+####################
+def async_speed_test():
+    current = time()
+    ChainIter(range(100)).async_map(async_titest).calc()
+    print(time() - current)
+
+    current = time()
+    ChainIter(range(100)).map(titest).calc()
+    print(time() - current)
+####################
 
 def api_test():
     print(ChainIter(range(10)) > 5)
@@ -84,4 +101,5 @@ ChainIter([1, 2]).zip([3, 4]).calc().print().async_pstarmap(2)(async_ptest4, 7, 
 ChainIter([1, 2]).async_pmap(2)(async_ptest3, 7, 1).calc().print()
 ####################
 speed_test()
+async_speed_test()
 api_test()

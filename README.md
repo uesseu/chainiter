@@ -47,7 +47,7 @@ def test(x):
 result = ChainIter(range(50)).map(test).calc().get()
 ```
 
-### Laze methods
+### Lazy methods
 In ChainIter, lazy methods are
 
 - map(only when chunk size is not set)

@@ -1,4 +1,4 @@
-from chainiter import ChainIter, future, ProgressBar, curry, logger
+from chainiter import ChainIter, future, ProgressBar, curry, logger, start_async, run_async, run_coroutine
 from doctest import testmod
 from time import sleep, time
 import asyncio
@@ -6,6 +6,7 @@ from logging import getLogger, basicConfig, INFO, WARNING, StreamHandler
 from itertools import product
 basicConfig(level=INFO)
 # logger.addHandler(StreamHandler())
+
 
 
 ####################
@@ -17,6 +18,26 @@ def mm(x, y):
 print(mm(9)(8))
 ####################
 
+####################
+# Future test
+####################
+def sleep_test(x: int) -> int:
+    print(x)
+    sleep(1)
+    return x * 2
+async def _future_test():
+    print('sleep')
+    a = start_async(asyncio.sleep, 1)
+    b = start_async(asyncio.sleep, 2)
+    c = start_async(asyncio.sleep, 3)
+    d = start_async(asyncio.sleep, 4)
+    result = await asyncio.gather(a, b, c, d)
+
+def future_test():
+    print(run_coroutine(_future_test()))
+    print('slept')
+
+####################
 
 async def itest(x: int) -> int: return x * 2
 
@@ -29,7 +50,6 @@ async def hoge(x: int) -> int:
 async def test(x: int) -> int:
     # print(hoge.__doc__)
     return await hoge(x)
-
 
 def test3(x: int, y: int) -> int: return x * y
 def test2(x: int) -> int: return x * 2
@@ -66,6 +86,15 @@ def async_speed_test():
     current = time()
     ChainIter(range(100)).map(titest).calc()
     print(time() - current)
+
+    current = time()
+    ChainIter(range(100)).async_map(async_titest, 5).calc()
+    print(time() - current)
+
+    current = time()
+    ChainIter(range(100)).map(titest, 5).calc()
+    print(time() - current)
+    input()
 ####################
 
 def api_test():
@@ -100,6 +129,7 @@ async def async_ptest4(x: int, y: int, z: int, zz: int) -> int:
 ChainIter([1, 2]).zip([3, 4]).calc().print().async_pstarmap(2)(async_ptest4, 7, 1).calc().print()
 ChainIter([1, 2]).async_pmap(2)(async_ptest3, 7, 1).calc().print()
 ####################
-speed_test()
-async_speed_test()
-api_test()
+# speed_test()
+# async_speed_test()
+future_test()
+# api_test()

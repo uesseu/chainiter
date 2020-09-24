@@ -1,6 +1,6 @@
 from asyncio import new_event_loop, ensure_future, Future
 from typing import (Any, Callable, Iterable, cast, Coroutine,
-                    Union, Sized, Optional)
+                    Union, Sized, Optional, TypeVar, Coroutine)
 from itertools import starmap, product
 from collections import namedtuple
 from multiprocessing import Pool
@@ -127,6 +127,13 @@ def run_coroutine(col: Coroutine) -> Any:
     loop.close()
     return result
 
+def start_async(func: Callable, *args, **kwargs) -> Future:
+    """
+    Start async function instantly.
+    """
+    async def wrap():
+        return func(*args, **kwargs)
+    return ensure_future(wrap())
 
 def future(func: Callable) -> Callable:
     """
@@ -833,6 +840,9 @@ class ChainIter:
 
 def chain_product(*args: Iterable) -> ChainIter:
     """
+    Just a product for ChainIter.
+    It is used as double for loop.
+
     Returns
     ---------
     ChainIter object.

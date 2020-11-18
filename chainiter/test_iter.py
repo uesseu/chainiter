@@ -8,7 +8,6 @@ basicConfig(level=INFO)
 # logger.addHandler(StreamHandler())
 
 
-
 ####################
 # Curry test
 ####################
@@ -63,6 +62,12 @@ async def async_titest(x: int) -> int:
     return x * 2
 
 ####################
+# Normal test
+####################
+ChainIter([1, 2, 3]).map(test2).calc()
+ChainIter([(1, 2), (3, 5)]).starmap(test3).calc()
+####################
+####################
 # Speed test
 ####################
 def speed_test():
@@ -94,7 +99,6 @@ def async_speed_test():
     current = time()
     ChainIter(range(100)).map(titest, 5).calc()
     print(time() - current)
-    input()
 ####################
 
 def api_test():
@@ -129,7 +133,7 @@ async def async_ptest4(x: int, y: int, z: int, zz: int) -> int:
 ChainIter([1, 2]).zip([3, 4]).calc().print().async_pstarmap(2)(async_ptest4, 7, 1).calc().print()
 ChainIter([1, 2]).async_pmap(2)(async_ptest3, 7, 1).calc().print()
 ####################
-# speed_test()
-# async_speed_test()
+speed_test()
+async_speed_test()
 future_test()
-# api_test()
+api_test()

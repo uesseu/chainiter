@@ -170,12 +170,7 @@ def make_color(txt: str, num: int) -> str:
     reset = '\033[0m'
     return color + txt + reset
 
-
-class ChainIter:
-    """
-    Iterator which can used by method chain like Arry of node.js.
-    Multi processing and asyncio can run.
-    """
+class ChainBase:
     def __init__(self, data: Union[list, Iterable],
                  indexable: bool = False, max_num: int = 0,
                  bar: Union[ProgressBar, None, bool] = None):
@@ -196,17 +191,220 @@ class ChainIter:
             TypeError('It is not iterator')
         self.data = data
         self.indexable = indexable
-        self.num = 0  # Iterator needs number.
+        self._num = 0  # Iterator needs number.
         self.bar: Union[ProgressBar, None, bool]
         if hasattr(data, '__len__'):
-            self.max = len(cast(Sized, data))
+            self._max = len(cast(Sized, data))
         else:
-            self.max = max_num
+            self._max = max_num
         if isinstance(bar, bool) and bar:
             self.bar = ProgressBar()
         else:
             self.bar = bar
-        self.bar_len = 30
+        self._bar_len = 30
+
+    def calc(self) -> 'ChainIter':
+        """
+        ChainIter.data may be list, map, filter and so on.
+        This method translate it to list.
+        If you do not run in parallel, it can print progress bar.
+
+        Returns
+        ----------
+        ChainIter object with result.
+        """
+        if isinstance(self.bar, ProgressBar) and not self.indexable:
+            res = []
+            start_time = current_time = time.time()
+            for n, v in enumerate(self.data):
+                res.append(v)
+                prev_time = current_time
+                current_time = time.time()
+                epoch_time = current_time - prev_time
+                if self._max != 0:
+                    bar_num = int((n + 1) / self._max * self._bar_len)
+                    percent = int(100 * (n + 1) / self._max)
+                    bar = self.bar.bar * bar_num
+                    print(self.bar.progress.format(
+                        percent=percent,
+                        bar=bar,
+                        arrow=self.bar.arrow,
+                        space=self.bar.space * (self._bar_len - bar_num),
+                        div=' ' + str(n + 1) + '/' + str(self._max),
+                        epoch_time=round(epoch_time, 3),
+                        speed=round(1 / epoch_time, 3)
+                        ), end='')
+                else:
+                    print(self.bar.cycle.format(
+                        cycle=self.bar.cycle_token[n % 4],
+                        div=' ' + str(n + 1) + '/' + str(self._max),
+                        epoch_time=round(epoch_time, 3),
+                        speed=round(1 / epoch_time, 3)
+                        ), end='')
+            print('\nComplete in {sec} sec!'.format(
+                sec=round(time.time()-start_time, 3)))
+            self.data = res
+            return cast(ChainIter, self)
+        else:
+            self.data = list(self.data)
+        return cast(ChainIter, self)
+
+class ChainOperator(ChainBase):
+    def __add__(self, item: Any) -> 'ChainIter':
+        if not hasattr(self.data, 'append'):
+            raise IndexError('Run ChainIter.calc().')
+        cast(list, self.data).append(item)
+        return cast(ChainIter, self)
+
+    def __setitem__(self, key: Any, item: Any) -> None:
+        if hasattr(self.data, '__setitem__'):
+            cast(list, self.data)[key] = item
+        raise IndexError('Item cannot be set. Run ChainIter.calc().')
+
+    def __lt__(self, arg: Any) -> list:
+        return ChainIter(map(lambda x: x < arg, self.data)).get()
+
+    def __le__(self, arg: Any) -> list:
+        return ChainIter(map(lambda x: x <= arg, self.data)).get()
+
+    def __gt__(self, arg: Any) -> list:
+        return ChainIter(map(lambda x: x > arg, self.data)).get()
+
+    def __ge__(self, arg: Any) -> list:
+        return ChainIter(map(lambda x: x >= arg, self.data)).get()
+
+
+class ChainPrivate(ChainOperator):
+
+    def __reversed__(self) -> Iterable:
+        if hasattr(self.data, '__reversed__'):
+            return cast(list, self.data).__reversed__()
+        raise IndexError('Not reversible')
+
+    def _has_index(self) -> bool:
+        """
+        Return whether it is indexable or not.
+        """
+        return True if self.indexable else hasattr(self.data, '__getitem__')
+
+    def __len__(self) -> int:
+        if not self.indexable:
+            self.calc()
+            self.indexable = True
+        return len(cast(list, self.data))
+
+    def __repr__(self) -> str:
+        return 'ChainIter[{}]'.format(str(self.data))
+
+    def __str__(self) -> str:
+        return 'ChainIter[{}]'.format(str(self.data))
+
+    def __getitem__(self, num: int) -> Any:
+        if self._has_index():
+            return cast(list, self.data)[num]
+        self.data = tuple(self.data)
+        return self.data[num]
+
+    def __iter__(self) -> 'ChainIter':
+        bar = self.bar
+        self.bar = None
+        self.calc()
+        self.bar = bar
+        self._max = len(cast(list, self.data))
+        self._num = 0
+        self.start_time = self.current_time = time.time()
+        return cast(ChainIter, self)
+
+    def __next__(self) -> Any:
+        if isinstance(self.bar, ProgressBar):
+            self._prev_time = self.current_time
+            self.current_time = time.time()
+            epoch_time = self.current_time - self._prev_time + 1e-15
+            if self._max != 0:
+                bar_num = int((self._num + 1) / self._max * self._bar_len)
+                print(self.bar.progress.format(
+                    percent=int(100 * (self._num) / self._max),
+                    bar=self.bar.bar * bar_num,
+                    arrow=self.bar.arrow,
+                    space=self.bar.space * (self._bar_len - bar_num),
+                    div=' ' + str(self._num) + '/' + str(self._max),
+                    epoch_time=round(epoch_time, 3),
+                    speed=round(1 / epoch_time, 3)
+                    ), end='')
+            else:
+                print(self.bar.cycle.format(
+                    cycle=self.bar.cycle_token[self._num % 4],
+                    div=' ' + str(self._num) + '/' + str(self._max),
+                    epoch_time=round(epoch_time, 3),
+                    speed=round(1 / epoch_time, 3)
+                    ), end='')
+        if self._num == self._max:
+            if self.bar:
+                print('\nComplete in {sec} sec!'.format(
+                    sec=round(time.time() - self.start_time, 3)))
+            self._num = 0
+            raise StopIteration
+        result = self.__getitem__(self._num)
+        self._num += 1
+        return result
+
+class ChainIterBase(ChainPrivate):
+    def append(self, item: Any) -> 'ChainIter':
+        if not isinstance(self.data, list):
+            self.calc()
+        cast(list, self.data).append(item)
+        return cast(ChainIter, self)
+
+    def get(self, kind: type = list) -> Any:
+        """
+        Get data as list.
+
+        Parameters
+        ----------
+        kind: Callable
+            If you want to convert to object which is not list,
+            you can set it. For example, tuple, dqueue, and so on.
+        """
+        if self.indexable and isinstance(self.data, list):
+            return self.data
+        return kind(self.data)
+
+    def len(self) -> int:
+        return len(self)
+
+class ChainIterNormal(ChainIterBase):
+
+    def zip(self, *args: Iterable) -> 'ChainIter':
+        """
+        Simple chainable zip function.
+        It kills progress bar.
+
+        Parameters
+        ----------
+        *args: Iterators to zip.
+
+        Returns
+        ----------
+        Result of func(*ChainIter, *args, **kwargs)
+        """
+        return ChainIter(zip(self.data, *args), False, 0, self.bar)
+
+    def reduce(self, func: Callable, logger: Logger = logger) -> Any:
+        """
+        Simple reduce function.
+
+        Parameters
+        ----------
+        func: Callable
+        logger: logging.Logger
+            Your favorite logger.
+
+        Returns
+        ----------
+        Result of reduce.
+        """
+        write_info(func, 1, logger)
+        return reduce(func, self.data)
 
     def map(self, func: Callable, chunk: int = 1,
             timeout: Optional[float] = None,
@@ -236,11 +434,11 @@ class ChainIter:
         [10, 12]
         """
         write_info(func, chunk, logger)
-        if (chunk == 1):
-            return ChainIter(map(func, self.data), False, self.max, self.bar)
+        if chunk == 1:
+            return ChainIter(map(func, self.data), False, self._max, self.bar)
         with Pool(chunk) as pool:
             result = pool.map_async(func, self.data).get(timeout)
-        return ChainIter(result, True, self.max, self.bar)
+        return ChainIter(result, True, self._max, self.bar)
 
     def starmap(self, func: Callable, chunk: int = 1,
                 timeout: Optional[float] = None,
@@ -273,11 +471,27 @@ class ChainIter:
         write_info(func, chunk, logger)
         if chunk == 1:
             return ChainIter(starmap(func, self.data),
-                             False, self.max, self.bar)
+                             False, self._max, self.bar)
         with Pool(chunk) as pool:
             result = pool.starmap_async(func, self.data).get(timeout)
-        return ChainIter(result, True, self.max, self.bar)
+        return ChainIter(result, True, self._max, self.bar)
 
+    def filter(self, func: Callable, logger: Logger = logger) -> 'ChainIter':
+        """
+        Simple filter function.
+        It kills progress bar.
+
+        Parameters
+        ----------
+        func: Callable
+        logger: logging.Logger
+            Your favorite logger.
+        """
+        write_info(func, 1, logger)
+        return ChainIter(filter(func, self.data), False, 0, self.bar)
+
+
+class ChainIterPartial(ChainIterNormal):
     def pmap(self, chunk: int = 1, timeout: Optional[float] = None,
              logger: Logger = logger) -> Callable:
         """
@@ -377,20 +591,6 @@ class ChainIter:
                                 chunk, timeout, logger)
         return wrap
 
-    def filter(self, func: Callable, logger: Logger = logger) -> 'ChainIter':
-        """
-        Simple filter function.
-        It kills progress bar.
-
-        Parameters
-        ----------
-        func: Callable
-        logger: logging.Logger
-            Your favorite logger.
-        """
-        write_info(func, 1, logger)
-        return ChainIter(filter(func, self.data), False, 0, self.bar)
-
     def pfilter(self, *args, logger: Logger = logger, **kwargs) -> 'ChainIter':
         """
         Simple filter function.
@@ -405,6 +605,7 @@ class ChainIter:
         write_info(args[0], 1, logger)
         return ChainIter(filter(partial(*args, **kwargs), self.data), False, 0, self.bar)
 
+class ChainIterAsync(ChainIterBase):
     def async_map(self, func: Callable, chunk: int = 1,
                   timeout: Optional[float] = None,
                   logger: Logger = logger) -> 'ChainIter':
@@ -436,12 +637,12 @@ class ChainIter:
         if chunk == 1:
             return ChainIter(
                 starmap(run_async, ((func, a) for a in self.data)),
-                False, self.max, self.bar)
+                False, self._max, self.bar)
         with Pool(chunk) as pool:
             result = pool.starmap_async(
                 run_async,
                 ((func, a) for a in self.data)).get(timeout)
-        return ChainIter(result, True, self.max, self.bar)
+        return ChainIter(result, True, self._max, self.bar)
 
     def async_starmap(self, func: Callable, chunk: int = 1,
                       timeout: Optional[float] = None,
@@ -474,11 +675,11 @@ class ChainIter:
         if chunk == 1:
             return ChainIter(
                 starmap(run_async, ((func, *a) for a in self.data)),
-                False, self.max, self.bar)
+                False, self._max, self.bar)
         with Pool(chunk) as pool:
             result = pool.starmap_async(
                 run_async, ((func, *a) for a in self.data)).get(timeout)
-        return ChainIter(result, True, self.max, self.bar)
+        return ChainIter(result, True, self._max, self.bar)
 
     def async_pmap(self, chunk: int = 1,
                    timeout: Optional[float] = None,
@@ -582,125 +783,35 @@ class ChainIter:
                                       chunk, timeout, logger)
         return wrap
 
-    def has_index(self) -> bool:
+
+class ChainMisc(ChainBase):
+    def print(self) -> 'ChainIter':
         """
-        Return whether it is indexable or not.
+        Just print the content.
         """
-        return True if self.indexable else hasattr(self.data, '__getitem__')
+        print(self.data)
+        return cast(ChainIter, self)
 
-    def __getitem__(self, num: int) -> Any:
-        if self.has_index():
-            return cast(list, self.data)[num]
-        self.data = tuple(self.data)
-        return self.data[num]
-
-    def reduce(self, func: Callable, logger: Logger = logger) -> Any:
+    def log(self, logger: Logger = logger, level: int = INFO) -> 'ChainIter':
         """
-        Simple reduce function.
-
-        Parameters
-        ----------
-        func: Callable
-        logger: logging.Logger
-            Your favorite logger.
-
-        Returns
-        ----------
-        Result of reduce.
+        Just print the content.
         """
-        write_info(func, 1, logger)
-        return reduce(func, self.data)
+        if level == INFO:
+            logger.info(self.data)
+        elif level == WARNING:
+            logger.warning(self.data)
+        elif level == ERROR:
+            logger.error(self.data)
+        elif level == CRITICAL:
+            logger.critical(self.data)
+        return cast(ChainIter, self)
 
-    def get(self, kind: type = list) -> Any:
+    def print_len(self) -> 'ChainIter':
         """
-        Get data as list.
-
-        Parameters
-        ----------
-        kind: Callable
-            If you want to convert to object which is not list,
-            you can set it. For example, tuple, dqueue, and so on.
+        Just print length of the content.
         """
-        if self.indexable and isinstance(self.data, list):
-            return self.data
-        return kind(self.data)
-
-    def zip(self, *args: Iterable) -> 'ChainIter':
-        """
-        Simple chainable zip function.
-        It kills progress bar.
-
-        Parameters
-        ----------
-        *args: Iterators to zip.
-
-        Returns
-        ----------
-        Result of func(*ChainIter, *args, **kwargs)
-        """
-        return ChainIter(zip(self.data, *args), False, 0, self.bar)
-
-    def __iter__(self) -> 'ChainIter':
-        bar = self.bar
-        self.bar = None
-        self.calc()
-        self.bar = bar
-        self.max = len(cast(list, self.data))
-        self.num = 0
-        self.start_time = self.current_time = time.time()
-        return self
-
-    def __next__(self) -> Any:
-        if isinstance(self.bar, ProgressBar):
-            self.prev_time = self.current_time
-            self.current_time = time.time()
-            epoch_time = self.current_time - self.prev_time + 1e-15
-            if self.max != 0:
-                bar_num = int((self.num + 1) / self.max * self.bar_len)
-                print(self.bar.progress.format(
-                    percent=int(100 * (self.num) / self.max),
-                    bar=self.bar.bar * bar_num,
-                    arrow=self.bar.arrow,
-                    space=self.bar.space * (self.bar_len - bar_num),
-                    div=' ' + str(self.num) + '/' + str(self.max),
-                    epoch_time=round(epoch_time, 3),
-                    speed=round(1 / epoch_time, 3)
-                    ), end='')
-            else:
-                print(self.bar.cycle.format(
-                    cycle=self.bar.cycle_token[self.num % 4],
-                    div=' ' + str(self.num) + '/' + str(self.max),
-                    epoch_time=round(epoch_time, 3),
-                    speed=round(1 / epoch_time, 3)
-                    ), end='')
-        if self.num == self.max:
-            if self.bar:
-                print('\nComplete in {sec} sec!'.format(
-                    sec=round(time.time() - self.start_time, 3)))
-            self.num = 0
-            raise StopIteration
-        result = self.__getitem__(self.num)
-        self.num += 1
-        return result
-
-    def append(self, item: Any) -> 'ChainIter':
-        if not isinstance(self.data, list):
-            self.calc()
-        cast(list, self.data).append(item)
-        return self
-
-    def __add__(self, item: Any) -> 'ChainIter':
-        return self.append(item)
-
-    def __reversed__(self) -> Iterable:
-        if hasattr(self.data, '__reversed__'):
-            return cast(list, self.data).__reversed__()
-        raise IndexError('Not reversible')
-
-    def __setitem__(self, key: Any, item: Any) -> None:
-        if hasattr(self.data, '__setitem__'):
-            cast(list, self.data)[key] = item
-        raise IndexError('Item cannot be set.')
+        print(len(list(self.data)))
+        return cast(ChainIter, self)
 
     def arg(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
         """
@@ -736,106 +847,17 @@ class ChainIter:
         """
         return func(*tuple(self.data), *args, **kwargs)
 
-    def calc(self) -> 'ChainIter':
-        """
-        ChainIter.data may be list, map, filter and so on.
-        This method translate it to list.
-        If you do not run in parallel, it can print progress bar.
 
-        Returns
-        ----------
-        ChainIter object with result.
-        """
-        if isinstance(self.bar, ProgressBar) and not self.indexable:
-            res = []
-            start_time = current_time = time.time()
-            for n, v in enumerate(self.data):
-                res.append(v)
-                prev_time = current_time
-                current_time = time.time()
-                epoch_time = current_time - prev_time
-                if self.max != 0:
-                    bar_num = int((n + 1) / self.max * self.bar_len)
-                    percent = int(100 * (n + 1) / self.max)
-                    bar = self.bar.bar * bar_num
-                    print(self.bar.progress.format(
-                        percent=percent,
-                        bar=bar,
-                        arrow=self.bar.arrow,
-                        space=self.bar.space * (self.bar_len - bar_num),
-                        div=' ' + str(n + 1) + '/' + str(self.max),
-                        epoch_time=round(epoch_time, 3),
-                        speed=round(1 / epoch_time, 3)
-                        ), end='')
-                else:
-                    print(self.bar.cycle.format(
-                        cycle=self.bar.cycle_token[n % 4],
-                        div=' ' + str(n + 1) + '/' + str(self.max),
-                        epoch_time=round(epoch_time, 3),
-                        speed=round(1 / epoch_time, 3)
-                        ), end='')
-            print('\nComplete in {sec} sec!'.format(
-                sec=round(time.time()-start_time, 3)))
-            self.data = res
-            return self
-        else:
-            self.data = list(self.data)
-        return self
-
-    def len(self) -> int:
-        return len(self)
-
-    def __lt__(self, arg: Any) -> list:
-        return ChainIter(map(lambda x: x < arg, self.data)).get()
-
-    def __le__(self, arg: Any) -> list:
-        return ChainIter(map(lambda x: x <= arg, self.data)).get()
-
-    def __gt__(self, arg: Any) -> list:
-        return ChainIter(map(lambda x: x > arg, self.data)).get()
-
-    def __ge__(self, arg: Any) -> list:
-        return ChainIter(map(lambda x: x >= arg, self.data)).get()
-
-    def __len__(self) -> int:
-        if not self.indexable:
-            self.calc()
-            self.indexable = True
-        return len(cast(list, self.data))
-
-    def __repr__(self) -> str:
-        return 'ChainIter[{}]'.format(str(self.data))
-
-    def __str__(self) -> str:
-        return 'ChainIter[{}]'.format(str(self.data))
-
-    def print(self) -> 'ChainIter':
-        """
-        Just print the content.
-        """
-        print(self.data)
-        return self
-
-    def log(self, logger: Logger = logger, level: int = INFO) -> 'ChainIter':
-        """
-        Just print the content.
-        """
-        if level == INFO:
-            logger.info(self.data)
-        elif level == WARNING:
-            logger.warning(self.data)
-        elif level == ERROR:
-            logger.error(self.data)
-        elif level == CRITICAL:
-            logger.critical(self.data)
-        return self
-
-    def print_len(self) -> 'ChainIter':
-        """
-        Just print length of the content.
-        """
-        print(len(list(self.data)))
-        return self
+class ChainIter(ChainIterNormal, ChainIterAsync):
+    """
+    Iterator which can used by method chain like Arry of node.js.
+    Multi processing and asyncio can run.
+    """
+    def __init__(self, data: Union[list, Iterable],
+                 indexable: bool = False, max_num: int = 0,
+                 bar: Union[ProgressBar, None, bool] = None):
+        super(ChainIter, self).__init__(
+            data, indexable, max_num, bar)
 
 
 def chain_product(*args: Iterable) -> ChainIter:

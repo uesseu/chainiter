@@ -848,7 +848,7 @@ class ChainMisc(ChainBase):
         return func(*tuple(self.data), *args, **kwargs)
 
 
-class ChainIter(ChainIterNormal, ChainIterAsync):
+class ChainIter(ChainIterNormal, ChainMisc, ChainIterAsync):
     """
     Iterator which can used by method chain like Arry of node.js.
     Multi processing and asyncio can run.

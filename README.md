@@ -2,7 +2,8 @@
 ## What is this?
 
 This is an iterator object package. Multiprocessing can be performed easily.  
-It can...
+Asynchronous processing was difficult to perform in parallel.
+But by this, it is easy to perform. It can...
 
 - Use map, filter, and reduce by method chain like Node.js.
 - Calculate fast for a python code.

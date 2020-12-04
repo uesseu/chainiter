@@ -1,3 +1,21 @@
+"""
+Ninja speed iterator package.
+This is an iterator like Array object of Node.js.
+Chainable fast iterators can be used.
+Furturemore, generator based pipeline can be used.
+
+Chainiter is built on objects.
+ChainIterPrivate
+ChainIterBase
+ChainIterNormal
+ChainIterAsync
+
+Object hierarchie is...
+Private -> Base
+Base -> Normal
+Base -> Async
+Normal + Async -> ChainIter
+"""
 from asyncio import new_event_loop, ensure_future, Future
 from typing import (Any, Callable, Iterable, cast, Coroutine,
                     Union, Sized, Optional, TypeVar, Coroutine)
@@ -178,6 +196,19 @@ def as_sync(func):
         loop.close()
         return result
     return wrap
+
+def as_sync(func):
+    """
+    Make an async function a normal function.
+    """
+    @wraps(func)
+    def wrap(*args, **kwargs):
+        loop = new_event_loop()
+        result = loop.run_until_complete(func(*args, **kwargs))
+        loop.close()
+        return result
+    return wrap
+
 
 def make_color(txt: str, num: int) -> str:
     color = '\033[9' + str(6 - num) + 'm'
@@ -504,6 +535,185 @@ class ChainIterNormal(ChainIterBase):
         return ChainIter(filter(func, self.data), False, 0, self.bar)
 
 
+class ChainIterAsync(ChainIterBase):
+    def async_map(self, func: Callable, chunk: int = 1,
+                  timeout: Optional[float] = None,
+                  logger: Logger = logger) -> 'ChainIter':
+        """
+        Chainable map of coroutine, for example, async def function.
+
+        Parameters
+        ----------
+        func: Callable
+            Function to run.
+        chunk: int
+            Number of cpu cores.
+            If it is larger than 1, multiprocessing based on
+            multiprocessing.Pool will be run.
+            And so, If func cannot be lambda or coroutine if
+            it is larger than 1.
+        timeout: Optional[float] = None
+            Time to stop parallel computing.
+        logger: logging.Logger
+            Your favorite logger.
+        Returns
+        ---------
+        ChainIter with result
+        >>> async def multest(x): return x * 2
+        >>> ChainIter([1, 2]).async_map(multest).get()
+        [2, 4]
+        """
+        write_info(func, chunk, logger)
+        if chunk == 1:
+            return ChainIter(
+                starmap(run_async, ((func, a) for a in self.data)),
+                False, self._max, self.bar)
+        with Pool(chunk) as pool:
+            result = pool.starmap_async(
+                run_async,
+                ((func, a) for a in self.data)).get(timeout)
+        return ChainIter(result, True, self._max, self.bar)
+
+    def async_starmap(self, func: Callable, chunk: int = 1,
+                      timeout: Optional[float] = None,
+                      logger: Logger = logger) -> 'ChainIter':
+        """
+        Chainable starmap of coroutine, for example, async def function.
+
+        Parameters
+        ----------
+        func: Callable
+            Function to run.
+        chunk: int
+            Number of cpu cores.
+            If it is larger than 1, multiprocessing based on
+            multiprocessing.Pool will be run.
+            And so, If func cannot be lambda or coroutine if
+            it is larger than 1.
+        timeout: Optional[float] = None
+            Time to stop parallel computing.
+        logger: logging.Logger
+            Your favorite logger.
+        Returns
+        ---------
+        ChainIter with result
+        >>> async def multest(x, y): return x * y
+        >>> ChainIter(zip([5, 6], [1, 3])).async_starmap(multest).get()
+        [5, 18]
+        """
+        write_info(func, chunk, logger)
+        if chunk == 1:
+            return ChainIter(
+                starmap(run_async, ((func, *a) for a in self.data)),
+                False, self._max, self.bar)
+        with Pool(chunk) as pool:
+            result = pool.starmap_async(
+                run_async, ((func, *a) for a in self.data)).get(timeout)
+        return ChainIter(result, True, self._max, self.bar)
+
+    def async_pmap(self, chunk: int = 1,
+                   timeout: Optional[float] = None,
+                   logger: Logger = logger) -> Callable:
+        """
+        Partial version of ChainIter.async_map.
+        It does not return ChainIter object.
+        It returns a function which returns ChainIter.
+        Chainable starmap with partial function.
+        At first, it makes partial function,
+        and then, gets argument of ChainIter.
+
+        Parameters
+        ----------
+        chunk: int
+            Number of cores for parallel computing.
+        timeout: Optional[float] = None
+            Time to stop parallel computing.
+        logger: logging.Logger
+            Your favorite logger.
+
+        Returns
+        ---------
+        A function which returns ChainIter with result
+        >>> async def multest2(x, y, z): return x * y * z
+        >>> ChainIter([5, 6]).async_pmap()(multest2, 2, 3).get()
+        [30, 36]
+        """
+        def wrap(*args, **kwargs) -> 'ChainIter':
+            """
+            Chainable map of coroutine, for example, async def function.
+
+            Parameters
+            ----------
+            func: Callable
+                Function to run.
+            chunk: int
+                Number of cpu cores.
+                If it is larger than 1, multiprocessing based on
+                multiprocessing.Pool will be run.
+                And so, If func cannot be lambda or coroutine if
+                it is larger than 1.
+            timeout: Optional[float] = None
+                Time to stop parallel computing.
+            Returns
+            ---------
+            ChainIter with result
+            """
+            write_info(args[0], chunk, logger)
+            return self.async_map(partial(*args, **kwargs),
+                                  chunk, timeout, logger)
+        return wrap
+
+    def async_pstarmap(self, chunk: int = 1, timeout: Optional[float] = None,
+                       logger: Logger = logger) -> Callable:
+        """
+        Partial version of ChainIter.async_starmap.
+        It does not return ChainIter object.
+        It returns a function which returns ChainIter.
+        At first, it makes partial function,
+        and then, gets argument of ChainIter.
+
+        Parameters
+        ----------
+        chunk: int
+            Number of cores for parallel computing.
+        timeout: int
+            Timeout parameter of Pool.map.
+        logger: logging.Logger
+            Your favorite logger.
+
+        Returns
+        ---------
+        ChainIter with result
+        >>> async def multest2(x, y, z): return x * y * z
+        >>> ChainIter([5, 6]).zip([2, 3]).async_pstarmap()(multest2, 2).get()
+        [20, 36]
+        """
+        def wrap(*args, **kwargs) -> 'ChainIter':
+            """
+            Chainable starmap of coroutine, for example, async def function.
+
+            Parameters
+            ----------
+            func: Callable
+                Function to run.
+            chunk: int
+                Number of cpu cores.
+                If it is larger than 1, multiprocessing based on
+                multiprocessing.Pool will be run.
+                And so, If func cannot be lambda or coroutine if
+                it is larger than 1.
+            timeout: Optional[float] = None
+                Time to stop parallel computing.
+            Returns
+            ---------
+            ChainIter with result
+            """
+            write_info(args[0], chunk, logger)
+            return self.async_starmap(partial(*args, **kwargs),
+                                      chunk, timeout, logger)
+        return wrap
+
+
 class ChainMisc(ChainBase):
     def print(self) -> 'ChainIter':
         """
@@ -568,7 +778,7 @@ class ChainMisc(ChainBase):
         return func(*tuple(self.data), *args, **kwargs)
 
 
-class ChainIter(ChainIterNormal, ChainMisc):
+class ChainIter(ChainIterNormal, ChainMisc, ChainIterAsync):
     """
     Iterator which can used by method chain like Arry of node.js.
     Multi processing and asyncio can run.

@@ -3,6 +3,7 @@ from chainiter import ChainIter, future, ProgressBar, curry, logger, start_async
 from functools import partial
 from doctest import testmod
 from time import sleep, time
+from functools import partial
 import asyncio
 from logging import getLogger, basicConfig, INFO, WARNING, StreamHandler
 from itertools import product
@@ -46,7 +47,6 @@ class TestStringMethods(unittest.TestCase):
         self.assertEqual(ChainIter([[1, 2], [3, 4]]).starmap(
             async_star_func, 2).get(), [2, 12])
 
-
 def speed_test():
     print('first')
     current = time()
@@ -70,7 +70,6 @@ def async_speed_test():
     ChainIter(range(10000)).map(normal_func, 5).calc()
     print(time() - current)
 ####################
-
 
 speed_test()
 async_speed_test()

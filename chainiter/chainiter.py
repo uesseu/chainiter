@@ -1,3 +1,21 @@
+"""
+Ninja speed iterator package.
+This is an iterator like Array object of Node.js.
+Chainable fast iterators can be used.
+Furturemore, generator based pipeline can be used.
+
+Chainiter is built on objects.
+ChainIterPrivate
+ChainIterBase
+ChainIterNormal
+ChainIterAsync
+
+Object hierarchie is...
+Private -> Base
+Base -> Normal
+Base -> Async
+Normal + Async -> ChainIter
+"""
 from asyncio import new_event_loop, ensure_future, Future
 from typing import (Any, Callable, Iterable, cast, Coroutine,
                     Union, Sized, Optional, TypeVar, Coroutine)
@@ -163,6 +181,19 @@ def run_async(func: Callable, *args: Any, **kwargs: Any) -> Any:
     result = loop.run_until_complete(func(*args, **kwargs))
     loop.close()
     return result
+
+
+def as_sync(func):
+    """
+    Make an async function a normal function.
+    """
+    @wraps(func)
+    def wrap(*args, **kwargs):
+        loop = new_event_loop()
+        result = loop.run_until_complete(func(*args, **kwargs))
+        loop.close()
+        return result
+    return wrap
 
 
 def make_color(txt: str, num: int) -> str:
@@ -514,7 +545,7 @@ class ChainIterPartial(ChainIterNormal):
         A function which returns ChainIter with result
 
         >>> def multest(x, y): return x * y
-        >>> ChainIter([5, 6]).pmap()(multest, 2).get()
+        >>> ChainIterPartial([5, 6]).pmap()(multest, 2).get()
         [10, 12]
         """
         def wrap(*args, **kwargs) -> 'ChainIter':
@@ -629,9 +660,9 @@ class ChainIterAsync(ChainIterBase):
         Returns
         ---------
         ChainIter with result
-        >>> async def multest(x, y, z): return x * y * z
-        >>> ChainIter(zip([5, 6], [1, 3])).async_pstarmap()(multest, 2).get()
-        [10, 36]
+        >>> async def multest(x): return x * 2
+        >>> ChainIter([1, 2]).async_map(multest).get()
+        [2, 4]
         """
         write_info(func, chunk, logger)
         if chunk == 1:
@@ -667,9 +698,9 @@ class ChainIterAsync(ChainIterBase):
         Returns
         ---------
         ChainIter with result
-        >>> def multest(x, y, z): return x * y * z
-        >>> ChainIter(zip([5, 6], [1, 3])).pstarmap()(multest, 2).get()
-        [10, 36]
+        >>> async def multest(x, y): return x * y
+        >>> ChainIter(zip([5, 6], [1, 3])).async_starmap(multest).get()
+        [5, 18]
         """
         write_info(func, chunk, logger)
         if chunk == 1:

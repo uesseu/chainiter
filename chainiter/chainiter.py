@@ -34,6 +34,7 @@ import time
 from threading import Thread
 from queue import Queue
 import warnings
+from .pipeline import gen_map, gen_starmap
 logger = getLogger('chainiter')
 logger.addHandler(NullHandler())
 

@@ -1,5 +1,5 @@
 import unittest
-from chainiter import ChainIter, future, ProgressBar, curry, logger, start_async, run_async, run_coroutine
+from chainiter import ChainIter, future, ProgressBar, curry, logger, start_async, run_async, run_coroutine, thread_starmap, thread_map
 from functools import partial
 from doctest import testmod
 from time import sleep, time
@@ -46,6 +46,10 @@ class TestStringMethods(unittest.TestCase):
     def test_async_star_map_multi(self):
         self.assertEqual(ChainIter([[1, 2], [3, 4]]).starmap(
             async_star_func, 2).get(), [2, 12])
+    def test_threadmap(self):
+        self.assertEqual(
+            thread_map(normal_func, range(100)),
+            [n*2 for n in range(100)])
 
 def speed_test():
     print('first')
@@ -71,7 +75,17 @@ def async_speed_test():
     print(time() - current)
 ####################
 
-speed_test()
-async_speed_test()
+####################
+# Thread map test
+####################
+def thread_map_test():
+    current = time()
+    thread_map(normal_func, range(10000))
+    print(time() - current)
+    
+####################
 if __name__ == '__main__':
+    speed_test()
+    async_speed_test()
+    thread_map_test()
     unittest.main()

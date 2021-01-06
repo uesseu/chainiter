@@ -1,12 +1,12 @@
 from asyncio import sleep, ensure_future, Future, wait, get_event_loop
 import time
-from chainiter.pipline import ThreadPipeMap, tmap, tstarmap, tpmap, tpstarmap, separate_list
+from chainiter.pipeline import (ThreadPipeMap, tmap,
+                               tstarmap, gen_map, gen_starmap, separate_list)
 from logging import basicConfig, INFO
 from functools import partial
 from unittest import TestCase, main
 from multiprocessing import Pool
 basicConfig(level=INFO)
-
 
 
 def test(n):
@@ -50,13 +50,13 @@ class Test(TestCase):
         tester(self, ThreadPipeMap(3).map(test, [i for i in range(9)]).get())
 
     def test_mp(self):
-        res = tpmap(test, [i for i in range(9)], 3, 2)
+        res = gen_map(test, [i for i in range(9)], 3, 2)
         tester(self, res)
         res = tmap(test, [i for i in range(9)], 3)
         tester(self, res)
 
     def test_smp(self):
-        res = tpstarmap(test, [(i,) for i in range(9)], 3, 2)
+        res = gen_starmap(test, [(i,) for i in range(9)], 3, 2)
         tester(self, res)
         res = tstarmap(test, [(i,) for i in range(9)], 3)
         tester(self, res)

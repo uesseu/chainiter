@@ -217,14 +217,6 @@ ChainIter object with result.
 Simple filter function.  
 It kills progress bar.  
 
-### pfilter(self, *args, logger: logging.Logger, **kwargs) -> 'ChainIter'
-Partial version of filter function.  
-It kills progress bar.  
-pmap returns function, but pfilter returns chainiter.  
-  
-#### Parameters  
-func: Callable  
-
 ### get(self, kind:type=<class 'list'>) -> Any
 Get data as list.
 
@@ -262,49 +254,6 @@ ChainIter with result
 ```python
 ChainIter([5, 6]).map(lambda x: x * 2).get()
 [10, 12]
-```
-
-### pmap(self, chunk: int = 1, timeout:Optional[float] = None, logger: Logger = logger) -> 'ChainIter'
-Partial version of ChainIter.map. It does not return ChainIter object.
-It returns a function which returns ChainIter.
-Chainable starmap with partial function.
-At first, it makes partial function, and then, gets argument of ChainIter.
-
-#### Parameters  
-
-| arg     | type           |                                         |
-|---------|----------------|-----------------------------------------|
-| chunk   | int            | Number of cores for parallel computing. |
-| timeout | int            | Time to stop parallel computing.        |
-| logger  | logging.Logger | Your favorite logger.                   |
-
-Returns
-A function which returns ChainIter with result
-
-
-```python
-def multest(x, y): return x * y
-ChainIter([5, 6]).pmap(4)(multest, 2).get()
-```
-
-### pstarpmap(self, chunk: int = 1, timeout:Optional[float] = None, logger: Logger = logger) -> 'ChainIter'
-Partial version of ChainIter.starmap. It does not return ChainIter object.
-It returns a function which returns ChainIter.
-Chainable starmap with partial function.
-At first, it makes partial function, and then, gets argument of ChainIter.
-
-| arg     | type           |                                         |
-|---------|----------------|-----------------------------------------|
-| chunk   | int            | Number of cores for parallel computing. |
-| timeout | int            | Time to stop parallel computing.        |
-| logger  | logging.Logger | Your favorite logger.                   |
-
-Returns
-A function which returns ChainIter with result
-
-```python
-def multest(x, y, z): return x * y * z
-ChainIter(zip([5, 6], [1, 3])).pstarmap(4)(multest, 2).get()
 ```
 
 
@@ -372,50 +321,6 @@ ChainIter([5, 6]).zip([2, 3]).starmap(multest2).get()
 ```
 
 
-### async_pmap(self, chunk:int=1, timeout: Optional[float], logger: logging.Logger = logger, *args) -> Callable:
-Partial version of ChainIter.async_map.
-It does not return ChainIter object.
-It returns a function which returns ChainIter.
-Chainable starmap with partial function.
-At first, it makes partial function,
-and then, gets argument of ChainIter.
-
-| arg     | type           |                                         |
-|---------|----------------|-----------------------------------------|
-| chunk   | int            | Number of cores for parallel computing. |
-| timeout | float          | Time to stop parallel computing.        |
-| logger  | logging.Logger | Your favorite logger.                   |
-| arg     | type           |                                         |
-
-Returns
-A function which returns ChainIter with result
-
-```python
-async def multest2(x, y, z): return x * y * z
-ChainIter([5, 6]).async_pmap(multest2, 2, 3)().get()
-```
-
-### async_pstarmap(self, chunk:int=1, timeout: Optional[float], logger: logging.Logger = logger, *args) -> Callable:
-Partial version of ChainIter.async_starmap.
-It does not return ChainIter object.
-It returns a function which returns ChainIter.
-At first, it makes partial function,
-and then, gets argument of ChainIter.
-
-| arg     | type           |                                         |
-|---------|----------------|-----------------------------------------|
-| chunk   | int            | Number of cores for parallel computing. |
-| timeout | float          | Time to stop parallel computing.        |
-| logger  | logging.Logger | Your favorite logger.                   |
-| arg     | type           |                                         |
-
-Returns
-ChainIter with result
-
-```python
-async def multest2(x, y, z): return x * y * z
-ChainIter([5, 6]).zip([2, 3]).async_pstarmap()(multest2, 2).get()
-```
 
 ### zip(self, *args:Iterable) -> 'ChainIter'
 Simple chainable zip function.  

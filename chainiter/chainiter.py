@@ -3,22 +3,23 @@ Ninja speed iterator package.
 This is an iterator like Array object of Node.js.
 Chainable fast iterators can be used.
 Furturemore, generator based pipeline can be used.
-
-Chainiter is built on objects.
-ChainIterPrivate
-ChainIterBase
-ChainIterNormal
-ChainIterAsync
-
-Object hierarchie is...
-Private -> Base
-Base -> Normal
-Base -> Async
-Normal + Async -> ChainIter
 """
+
+# Chainiter is built on objects.
+# ChainIterPrivate
+# ChainIterBase
+# ChainIterNormal
+# ChainIterAsync
+# 
+# Object hierarchie is...
+# Private -> Base
+# Base -> Normal
+# Base -> Async
+# Normal + Async -> ChainIter
 from asyncio import new_event_loop, ensure_future, Future
 from typing import (Any, Callable, Iterable, cast, Coroutine,
-                    Union, Sized, Optional, TypeVar, Coroutine)
+                    Union, Sized, Optional, TypeVar, Coroutine,
+                    Tuple, Generator)
 from itertools import starmap, product
 from collections import namedtuple
 from multiprocessing import Pool
@@ -31,6 +32,7 @@ import os
 from contextlib import redirect_stdout
 import time
 from threading import Thread
+from queue import Queue
 import warnings
 logger = getLogger('chainiter')
 logger.addHandler(NullHandler())
@@ -611,108 +613,6 @@ class ChainIterAsync(ChainIterBase):
                 run_async, ((func, *a) for a in self.data)).get(timeout)
         return ChainIter(result, True, self._max, self.bar)
 
-    def async_pmap(self, chunk: int = 1,
-                   timeout: Optional[float] = None,
-                   logger: Logger = logger) -> Callable:
-        """
-        Partial version of ChainIter.async_map.
-        It does not return ChainIter object.
-        It returns a function which returns ChainIter.
-        Chainable starmap with partial function.
-        At first, it makes partial function,
-        and then, gets argument of ChainIter.
-
-        Parameters
-        ----------
-        chunk: int
-            Number of cores for parallel computing.
-        timeout: Optional[float] = None
-            Time to stop parallel computing.
-        logger: logging.Logger
-            Your favorite logger.
-
-        Returns
-        ---------
-        A function which returns ChainIter with result
-        >>> async def multest2(x, y, z): return x * y * z
-        >>> ChainIter([5, 6]).async_pmap()(multest2, 2, 3).get()
-        [30, 36]
-        """
-        def wrap(*args, **kwargs) -> 'ChainIter':
-            """
-            Chainable map of coroutine, for example, async def function.
-
-            Parameters
-            ----------
-            func: Callable
-                Function to run.
-            chunk: int
-                Number of cpu cores.
-                If it is larger than 1, multiprocessing based on
-                multiprocessing.Pool will be run.
-                And so, If func cannot be lambda or coroutine if
-                it is larger than 1.
-            timeout: Optional[float] = None
-                Time to stop parallel computing.
-            Returns
-            ---------
-            ChainIter with result
-            """
-            write_info(args[0], chunk, logger)
-            return self.async_map(partial(*args, **kwargs),
-                                  chunk, timeout, logger)
-        return wrap
-
-    def async_pstarmap(self, chunk: int = 1, timeout: Optional[float] = None,
-                       logger: Logger = logger) -> Callable:
-        """
-        Partial version of ChainIter.async_starmap.
-        It does not return ChainIter object.
-        It returns a function which returns ChainIter.
-        At first, it makes partial function,
-        and then, gets argument of ChainIter.
-
-        Parameters
-        ----------
-        chunk: int
-            Number of cores for parallel computing.
-        timeout: int
-            Timeout parameter of Pool.map.
-        logger: logging.Logger
-            Your favorite logger.
-
-        Returns
-        ---------
-        ChainIter with result
-        >>> async def multest2(x, y, z): return x * y * z
-        >>> ChainIter([5, 6]).zip([2, 3]).async_pstarmap()(multest2, 2).get()
-        [20, 36]
-        """
-        def wrap(*args, **kwargs) -> 'ChainIter':
-            """
-            Chainable starmap of coroutine, for example, async def function.
-
-            Parameters
-            ----------
-            func: Callable
-                Function to run.
-            chunk: int
-                Number of cpu cores.
-                If it is larger than 1, multiprocessing based on
-                multiprocessing.Pool will be run.
-                And so, If func cannot be lambda or coroutine if
-                it is larger than 1.
-            timeout: Optional[float] = None
-                Time to stop parallel computing.
-            Returns
-            ---------
-            ChainIter with result
-            """
-            write_info(args[0], chunk, logger)
-            return self.async_starmap(partial(*args, **kwargs),
-                                      chunk, timeout, logger)
-        return wrap
-
 
 class ChainMisc(ChainBase):
     def print(self) -> 'ChainIter':
@@ -801,6 +701,24 @@ def chain_product(*args: Iterable) -> ChainIter:
     """
     return ChainIter(product(args))
 
+
+def _tmp_thread(func: Callable, args: Tuple, q: Queue) -> None:
+    q.put(func(*args))
+def thread_starmap(func: Callable, args: Tuple[tuple]) -> list:
+    q: Queue = Queue()
+    ts = [Thread(target=_tmp_thread,
+                 args=((func,)+arg+(q,))) for arg in args]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    return [q.get() for t in ts]
+
+def thread_map(func: Callable, args: tuple) -> list:
+    q: Queue = Queue()
+    ts = [Thread(target=_tmp_thread,
+                 args=((func,(arg,),q,))) for arg in args]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    return [q.get() for t in ts]
 
 if __name__ == '__main__':
     testmod()

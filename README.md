@@ -10,21 +10,28 @@ But by this, it is easy to perform. It can...
 - Performe parallel computing.
 - Show progress bar(Only when without parallel computing).
 - Run coroutines in parallel.
-  + Ofcource, it can run asyncroniously!
-- Make partial function and run in parallel.
+  + Ofcource, it can run asynchronously!
+- Software pipeline like computing
 
 But be careful! It may be anti pattern, because of god class!
 
-## Is it fast for python?
+## Why pipeline?
+Async functions can use IO asynchronously, but it is not enough.  
+At first, async functions try to read all the data which is needed  
+asynchronously. It is good.  
+But when it performs multi-processing, many processes perform simultaneously.  
+This makes async function run as if 'synchronously'.
+If pipeline can be used, it runs as async perfectly.
 
+## Is it fast for python?
 It is based not on list but on iterators.  
-I tried to minimize orverhead. And so, usually, it is as fast as iterators of python.  
+I tried to minimize overhead. And so, usually, it is as fast as iterators of python.  
 And so, It may be much faster than list in some cases.
-It is a package for me, and I do'nt want slow one ;).  
+It is a package for me, and I do not want slow one ;).  
 
 Ofcource, speed of python is slow.  
 If you write a simple python code, it cannot be faster than numpy.  
-But calcurating by 1 process may be limited by IO, memory, and so on.  
+But calculating by 1 process may be limited by IO, memory, and so on.  
 When it shows progress bar, it may be slow.  
 
 ## install
@@ -34,7 +41,7 @@ pip install chainiter
 ```
 
 ## Example and basic usage
-It can run normal ans async functions.  
+It can run normal and async functions.  
 
 ### Normal functions
 - At first, define a function

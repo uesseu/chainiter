@@ -15,11 +15,12 @@ Furturemore, generator based pipeline can be used.
 # Private -> Base
 # Base -> Normal
 # Base -> Async
-# Normal + Async -> ChainIter
+# Base -> Gen
+# Normal + Async + Gen-> ChainIter
 from asyncio import new_event_loop, ensure_future, Future
 from typing import (Any, Callable, Iterable, cast, Coroutine,
                     Union, Sized, Optional, TypeVar, Coroutine,
-                    Tuple, Generator)
+                    Tuple, Generator, Iterator)
 from itertools import starmap, product
 from collections import namedtuple
 from multiprocessing import Pool
@@ -34,10 +35,21 @@ import time
 from threading import Thread
 from queue import Queue
 import warnings
+from enum import Enum
+from concurrent.futures import ThreadPoolExecutor
 from .pipeline import gen_map, gen_starmap
 logger = getLogger('chainiter')
 logger.addHandler(NullHandler())
 
+
+class ChainIterMode(Enum):
+    SINGLE = 'single'
+    THREAD = 'thread'
+    PROCESS = 'process'
+    BOTH = 3
+
+
+mode = ChainIterMode
 
 def compose(*funcs: Callable) -> Callable:
     """
@@ -89,7 +101,8 @@ def curry(num_of_args: Optional[int] = None) -> Callable:
     return curry_wrap
 
 
-def write_info(func: Callable, chunk: int = 1, logger: Logger = logger) -> None:
+def write_info(func: Callable, chunk: int = 1,
+               logger: Logger = logger, mode: str = 'single') -> None:
     """
     Log displayer of chainiter.
     """
@@ -98,7 +111,7 @@ def write_info(func: Callable, chunk: int = 1, logger: Logger = logger) -> None:
     else:
         logger.info('Running something without name.')
     if chunk > 1:
-        logger.info(f'Computing by {chunk} processes!')
+        logger.info(f'Computing by {chunk} {mode}!')
 
 
 class ProgressBar:
@@ -450,7 +463,8 @@ class ChainIterNormal(ChainIterBase):
         write_info(func, 1, logger)
         return reduce(func, self.data)
 
-    def map(self, func: Callable, chunk: int = 1,
+    def map(self, func: Callable, process: int = 1,
+            thread: int = 1,
             timeout: Optional[float] = None,
             logger: Logger = logger) -> 'ChainIter':
         """
@@ -477,16 +491,23 @@ class ChainIterNormal(ChainIterBase):
         >>> ChainIter([5, 6]).map(lambda x: x * 2).get()
         [10, 12]
         """
-        write_info(func, chunk, logger)
         _func = partial(run_async, func)
-        if chunk == 1:
+        if process == 1 and thread == 1:
+            write_info(func, 1, logger, 'single')
             return ChainIter(map(_func, self.data),
                              False, self._max, self.bar)
-        with Pool(chunk) as pool:
-            result = pool.map_async(_func, self.data).get(timeout)
-        return ChainIter(result, True, self._max, self.bar)
+        elif process != 1:
+            write_info(func, process, logger, 'process')
+            with Pool(process) as pool:
+                result = pool.map_async(_func, self.data).get(timeout)
+            return ChainIter(result, True, self._max, self.bar)
+        else:
+            write_info(func, thread, logger, 'thread')
+            with ThreadPoolExecutor(thread) as exe:
+                result = exe.map(_func, self.data)
+            return ChainIter(result, True, self._max, self.bar)
 
-    def starmap(self, func: Callable, chunk: int = 1,
+    def starmap(self, func: Callable, process: int = 1, thread: int = 1,
                 timeout: Optional[float] = None,
                 logger: Logger = logger) -> 'ChainIter':
         """
@@ -514,14 +535,20 @@ class ChainIterNormal(ChainIterBase):
         >>> ChainIter([5, 6]).zip([2, 3]).starmap(multest2).get()
         [10, 18]
         """
-        write_info(func, chunk, logger)
         _func = partial(run_async, func)
-        if chunk == 1:
+        if process == 1 and thread == 1:
+            write_info(func, 1, logger, 'single')
             return ChainIter(starmap(_func, self.data),
                              False, self._max, self.bar)
-        with Pool(chunk) as pool:
-            result = pool.starmap_async(_func, self.data).get(timeout)
-        return ChainIter(result, True, self._max, self.bar)
+        elif process != 1:
+            write_info(func, process, logger, 'single')
+            with Pool(process) as pool:
+                result = pool.starmap_async(_func, self.data).get(timeout)
+            return ChainIter(result, True, self._max, self.bar)
+        else:
+            write_info(func, thread, logger, 'single')
+            result = thread_starmap(_func, self.data)
+            return ChainIter(result, True, self._max, self.bar)
 
     def filter(self, func: Callable, logger: Logger = logger) -> 'ChainIter':
         """
@@ -537,9 +564,19 @@ class ChainIterNormal(ChainIterBase):
         write_info(func, 1, logger)
         return ChainIter(filter(func, self.data), False, 0, self.bar)
 
+class ChainIterGenerator(ChainIterBase):
+    def gen_map(self, gen, processes=1, use_error: bool = True) -> 'ChainIter':
+        return ChainIter(
+            gen_map(gen, self.data, processes, use_error),
+            True, self._max, self.bar)
+
+    def gen_starmap(self, gen, processes=1, use_error: bool = True) -> 'ChainIter':
+        return ChainIter(
+            gen_starmap(gen, self.data, processes, use_error),
+            True, self._max, self.bar)
 
 class ChainIterAsync(ChainIterBase):
-    def async_map(self, func: Callable, chunk: int = 1,
+    def async_map(self, func: Callable, process: int = 1, thread: int = 1,
                   timeout: Optional[float] = None,
                   logger: Logger = logger) -> 'ChainIter':
         """
@@ -566,18 +603,24 @@ class ChainIterAsync(ChainIterBase):
         >>> ChainIter([1, 2]).async_map(multest).get()
         [2, 4]
         """
-        write_info(func, chunk, logger)
-        if chunk == 1:
+        if process == 1 and thread == 1:
+            write_info(func, 1, logger, 'single')
             return ChainIter(
                 starmap(run_async, ((func, a) for a in self.data)),
                 False, self._max, self.bar)
-        with Pool(chunk) as pool:
-            result = pool.starmap_async(
-                run_async,
-                ((func, a) for a in self.data)).get(timeout)
-        return ChainIter(result, True, self._max, self.bar)
+        elif process != 1:
+            write_info(func, process, logger, 'process')
+            with Pool(process) as pool:
+                result = pool.starmap_async(run_async,
+                    ((func, a) for a in self.data)).get(timeout)
+            return ChainIter(result, True, self._max, self.bar)
+        else:
+            write_info(func, thread, logger, 'thread')
+            result = thread_starmap(run_async,
+                                    ((func, a) for a in self.data), thread)
+            return ChainIter(result, True, self._max, self.bar)
 
-    def async_starmap(self, func: Callable, chunk: int = 1,
+    def async_starmap(self, func: Callable, process: int = 1, thread: int = 1,
                       timeout: Optional[float] = None,
                       logger: Logger = logger) -> 'ChainIter':
         """
@@ -604,15 +647,22 @@ class ChainIterAsync(ChainIterBase):
         >>> ChainIter(zip([5, 6], [1, 3])).async_starmap(multest).get()
         [5, 18]
         """
-        write_info(func, chunk, logger)
-        if chunk == 1:
+        if process == 1 and thread == 1:
+            write_info(func, 1, logger, 'single')
             return ChainIter(
                 starmap(run_async, ((func, *a) for a in self.data)),
                 False, self._max, self.bar)
-        with Pool(chunk) as pool:
-            result = pool.starmap_async(
-                run_async, ((func, *a) for a in self.data)).get(timeout)
-        return ChainIter(result, True, self._max, self.bar)
+        elif process != 1:
+            write_info(func, process, logger, 'single')
+            with Pool(process) as pool:
+                result = pool.starmap_async(
+                    run_async, ((func, *a) for a in self.data)).get(timeout)
+            return ChainIter(result, True, self._max, self.bar)
+        else:
+            write_info(func, thread, logger, 'single')
+            result = thread_starmap(run_async,
+                           ((func, *a) for a in self.data), thread)
+            return ChainIter(result, True, self._max, self.bar)
 
 
 class ChainMisc(ChainBase):
@@ -679,7 +729,7 @@ class ChainMisc(ChainBase):
         return func(*tuple(self.data), *args, **kwargs)
 
 
-class ChainIter(ChainIterNormal, ChainMisc, ChainIterAsync):
+class ChainIter(ChainIterNormal, ChainMisc, ChainIterAsync, ChainIterGenerator):
     """
     Iterator which can used by method chain like Arry of node.js.
     Multi processing and asyncio can run.
@@ -691,35 +741,13 @@ class ChainIter(ChainIterNormal, ChainMisc, ChainIterAsync):
             data, indexable, max_num, bar)
 
 
-def chain_product(*args: Iterable) -> ChainIter:
-    """
-    Just a product for ChainIter.
-    It is used as double for loop.
+def _tmp_thread(args: Any) -> Any: return args[0](*args[1:])
+def thread_starmap(func: Callable, args: Union[list, Iterable],
+                   chunk: int = 1) -> Iterator:
+    with ThreadPoolExecutor(chunk) as exe:
+        result = exe.map(_tmp_thread, ((func, *a) for a in args))
+    return result
 
-    Returns
-    ---------
-    ChainIter object.
-    """
-    return ChainIter(product(args))
-
-
-def _tmp_thread(func: Callable, args: Tuple, q: Queue) -> None:
-    q.put(func(*args))
-def thread_starmap(func: Callable, args: Tuple[tuple]) -> list:
-    q: Queue = Queue()
-    ts = [Thread(target=_tmp_thread,
-                 args=((func,)+arg+(q,))) for arg in args]
-    [t.start() for t in ts]
-    [t.join() for t in ts]
-    return [q.get() for t in ts]
-
-def thread_map(func: Callable, args: tuple) -> list:
-    q: Queue = Queue()
-    ts = [Thread(target=_tmp_thread,
-                 args=((func,(arg,),q,))) for arg in args]
-    [t.start() for t in ts]
-    [t.join() for t in ts]
-    return [q.get() for t in ts]
 
 if __name__ == '__main__':
     testmod()
